@@ -1,6 +1,5 @@
 package com.demo.imgProcess;
 
-import com.demo.imgProcess.sseLogAppender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -21,13 +20,13 @@ import java.util.concurrent.TimeUnit;
 @RestController
 @CrossOrigin(origins = "http://localhost:8080") // 根据你的前端调整
 @RequestMapping("/sse")
-public class sseLogController {
+public class SseLogController {
 
-    private static final Logger logger = LoggerFactory.getLogger(sseLogController.class);
+    private static final Logger logger = LoggerFactory.getLogger(SseLogController.class);
 
     // 1. 管理所有连接的 SseEmitter 实例
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
-    private final BlockingQueue<String> logQueue = sseLogAppender.getLogQueue();
+    private final BlockingQueue<String> logQueue = SseLogAppender.getLogQueue();
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "sse-log-processor");
         t.setDaemon(true); // 设置为守护线程，以便主程序退出时它也退出

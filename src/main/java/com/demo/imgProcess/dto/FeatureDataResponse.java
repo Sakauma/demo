@@ -3,14 +3,14 @@ package com.demo.imgProcess.dto;
 import java.util.List;
 import java.util.Map;
 
-public class featureDataResponse {
+public class FeatureDataResponse {
     private boolean success;
     private String message;
     // 使用通配符以支持 List<Float> 或 List<Integer>
     private Map<String, List<? extends Number>> features;
 
     // 构造函数
-    public featureDataResponse(boolean success, String message, Map<String, List<? extends Number>> features) {
+    public FeatureDataResponse(boolean success, String message, Map<String, List<? extends Number>> features) {
         this.success = success;
         this.message = message;
         this.features = features;

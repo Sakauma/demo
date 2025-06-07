@@ -18,23 +18,23 @@ import java.util.Map;
 public class FeatureParserService {
     private static final Logger logger = LoggerFactory.getLogger(FeatureParserService.class);
 
-    private static final List<featureDefinition> ALL_FEATURE_DEFINITIONS_ORDERED = List.of(
-            new featureDefinition("variance", 'f'),
-            new featureDefinition("mean_region", 'f'),
-            new featureDefinition("SCR", 'f'),
-            new featureDefinition("contrast", 'f'),
-            new featureDefinition("entropy", 'f'),
-            new featureDefinition("homogeneity", 'f'),
-            new featureDefinition("smoothness", 'f'),
-            new featureDefinition("skewness", 'f'),
-            new featureDefinition("kurtosis", 'f'),
-            new featureDefinition("xjy_area", 'i'),         // 整型特征示例
-            new featureDefinition("peak_cell_intensity", 'f'),
-            new featureDefinition("xjy_background_intensity", 'f'),
-            new featureDefinition("tl_xs", 'i'),
-            new featureDefinition("tl_ys", 'i'),
-            new featureDefinition("widths", 'i'),
-            new featureDefinition("heights", 'i')
+    private static final List<FeatureDefinition> ALL_FEATURE_DEFINITIONS_ORDERED = List.of(
+            new FeatureDefinition("variance", 'f'),
+            new FeatureDefinition("mean_region", 'f'),
+            new FeatureDefinition("SCR", 'f'),
+            new FeatureDefinition("contrast", 'f'),
+            new FeatureDefinition("entropy", 'f'),
+            new FeatureDefinition("homogeneity", 'f'),
+            new FeatureDefinition("smoothness", 'f'),
+            new FeatureDefinition("skewness", 'f'),
+            new FeatureDefinition("kurtosis", 'f'),
+            new FeatureDefinition("xjy_area", 'i'),         // 整型特征示例
+            new FeatureDefinition("peak_cell_intensity", 'f'),
+            new FeatureDefinition("xjy_background_intensity", 'f'),
+            new FeatureDefinition("tl_xs", 'i'),
+            new FeatureDefinition("tl_ys", 'i'),
+            new FeatureDefinition("widths", 'i'),
+            new FeatureDefinition("heights", 'i')
     );
 
     public Map<String, List<? extends Number>> parseFeatureFile(String filePath) throws IOException {
@@ -54,7 +54,7 @@ public class FeatureParserService {
 
             if (numFrames <= 0) {
                 logger.warn("特征文件 '{}' 中没有有效的数据帧 (numFrames = {})。将返回空的特征集。", filePath, numFrames);
-                for (featureDefinition def : ALL_FEATURE_DEFINITIONS_ORDERED) {
+                for (FeatureDefinition def : ALL_FEATURE_DEFINITIONS_ORDERED) {
                     if (def.getTypeChar() == 'f') {
                         allParsedFeatures.put(def.getName(), new ArrayList<Float>());
                     } else if (def.getTypeChar() == 'i') {
@@ -64,7 +64,7 @@ public class FeatureParserService {
                 return allParsedFeatures;
             }
 
-            for (featureDefinition featureDef : ALL_FEATURE_DEFINITIONS_ORDERED) {
+            for (FeatureDefinition featureDef : ALL_FEATURE_DEFINITIONS_ORDERED) {
                 String featureName = featureDef.getName();
                 char typeChar = featureDef.getTypeChar();
                 int typeSize = featureDef.getTypeSize(); // 应为4

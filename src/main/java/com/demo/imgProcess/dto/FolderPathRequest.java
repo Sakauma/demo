@@ -1,7 +1,7 @@
 // src/main/java/com/demo/imgProcess/dto/FolderPathRequest.java
 package com.demo.imgProcess.dto;
 
-public class folderPathRequest {
+public class FolderPathRequest {
     private String folderPath;
     private String algorithm;
     public String getFolderPath() {

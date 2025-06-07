@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-public class parseCoord {
+public class ParseCoord {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     public static Map<String, Integer> parse(String cropDataJson) {
         Map<String, Integer> coordinates = new HashMap<>();

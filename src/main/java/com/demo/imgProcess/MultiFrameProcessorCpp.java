@@ -17,18 +17,16 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.demo.imgProcess.dto.multiFrameResultResponse;
+import com.demo.imgProcess.dto.MultiFrameResultResponse;
 
 @Service
-public class multiFrameProcessorCpp {
+public class MultiFrameProcessorCpp {
     static {
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("windows")) {
@@ -36,7 +34,7 @@ public class multiFrameProcessorCpp {
         }
     }
 
-    private static final Logger logger = LoggerFactory.getLogger(multiFrameProcessorCpp.class);
+    private static final Logger logger = LoggerFactory.getLogger(MultiFrameProcessorCpp.class);
 
     public static class CropBox extends Structure {
         public int x; public int y; public int width; public int height;
@@ -140,7 +138,7 @@ public class multiFrameProcessorCpp {
     }
 
 
-    public com.demo.imgProcess.dto.multiFrameResultResponse processDirectory(String inputDirPath, String algorithmName) {
+    public MultiFrameResultResponse processDirectory(String inputDirPath, String algorithmName) {
         logger.info("开始处理多帧目录: {}, 算法: {}", inputDirPath, algorithmName);
 
         List<String> filePathsList;
@@ -208,10 +206,10 @@ public class multiFrameProcessorCpp {
                     outputImageNames.add(baseName + ".png");
                 }
 
-                com.demo.imgProcess.dto.multiFrameResultResponse.ResultFiles resultFiles =
-                        new com.demo.imgProcess.dto.multiFrameResultResponse.ResultFiles(originalFileNamesOnly, interestImageNames, outputImageNames);
+                MultiFrameResultResponse.ResultFiles resultFiles =
+                        new MultiFrameResultResponse.ResultFiles(originalFileNamesOnly, interestImageNames, outputImageNames);
 
-                return new com.demo.imgProcess.dto.multiFrameResultResponse(
+                return new MultiFrameResultResponse(
                         true,
                         resultOutputDir,
                         resultFiles,

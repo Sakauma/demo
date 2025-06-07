@@ -4,13 +4,12 @@ import org.springframework.util.Base64Utils;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferByte;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Map;
 
-public class cropImg {
+public class CropImg {
 
     public static String cropImage(String base64Image, Map<String, Integer> cropCoordinates) throws IOException {
         if (base64Image == null || cropCoordinates == null || cropCoordinates.isEmpty()) {

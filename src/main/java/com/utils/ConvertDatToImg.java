@@ -13,7 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 
-public class convertDatToImg {
+public class ConvertDatToImg {
 
     //private static final int IMAGE_ROWS = 213;
     //private static final int IMAGE_COLS = 252;

@@ -1,10 +1,10 @@
 package com.demo.imgProcess.dto;
 
-public class featureDefinition {
+public class FeatureDefinition {
     private final String name;
     private final char typeChar; // 'f' 代表 float, 'i' 代表 int
 
-    public featureDefinition(String name, char typeChar) {
+    public FeatureDefinition(String name, char typeChar) {
         this.name = name;
         this.typeChar = typeChar;
     }

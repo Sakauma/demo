@@ -1,9 +1,8 @@
 package com.demo.imgProcess.dto;
 
 import java.util.List;
-import java.util.Map;
 
-public class multiFrameResultResponse {
+public class MultiFrameResultResponse {
     private boolean success;
     private String resultPath;
     private ResultFiles resultFiles;
@@ -28,7 +27,7 @@ public class multiFrameResultResponse {
         // Setters if needed
     }
 
-    public multiFrameResultResponse(boolean success, String resultPath, ResultFiles resultFiles, String message, Integer fileNumProcessed) {
+    public MultiFrameResultResponse(boolean success, String resultPath, ResultFiles resultFiles, String message, Integer fileNumProcessed) {
         this.success = success;
         this.resultPath = resultPath;
         this.resultFiles = resultFiles;
