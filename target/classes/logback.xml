@@ -1,0 +1,30 @@
+<configuration>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="SSE_APPENDER" class="com.demo.imgProcess.sseLogAppender">
+        <layout class="ch.qos.logback.classic.PatternLayout">
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{20} - %msg%n</pattern>
+        </layout>
+    </appender>
+
+    <!-- 根据需求选择是否保留 additivity="false" -->
+    <logger name="com.demo.imgProcess.imgController" level="INFO" additivity="false">
+        <appender-ref ref="SSE_APPENDER" />
+    </logger>
+    <logger name="com.demo.imgProcess.dto.FeatureParserService" level="INFO" additivity="false">
+        <appender-ref ref="SSE_APPENDER" />
+    </logger>
+    <logger name="com.demo.imgProcess.multiFrameProcessorCpp" level="INFO" additivity="false">
+        <appender-ref ref="SSE_APPENDER" />
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+    </root>
+
+</configuration>
