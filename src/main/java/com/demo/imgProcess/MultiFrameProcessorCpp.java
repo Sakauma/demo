@@ -1,4 +1,3 @@
-// src/main/java/com/demo/imgProcess/MultiFrameProcessorService.java
 package com.demo.imgProcess;
 
 import com.sun.jna.Library;
@@ -22,6 +21,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.demo.imgProcess.dto.MultiFrameResultResponse;
 
@@ -35,6 +36,15 @@ public class MultiFrameProcessorCpp {
     }
 
     private static final Logger logger = LoggerFactory.getLogger(MultiFrameProcessorCpp.class);
+
+    private final String iniFilePath;
+
+    // 通过构造函数注入配置值
+    @Autowired
+    public MultiFrameProcessorCpp(@Value("${app.config.ini-path}") String iniFilePath) {
+        this.iniFilePath = iniFilePath;
+        logger.info("配置文件路径已加载: {}", this.iniFilePath);
+    }
 
     public static class CropBox extends Structure {
         public int x; public int y; public int width; public int height;
@@ -84,16 +94,16 @@ public class MultiFrameProcessorCpp {
     }
 
     public interface NativeMultiFrameLib extends Library {
-        NativeMultiFrameLib INSTANCE = Native.load("XJYTXFCV_multi", NativeMultiFrameLib.class);
+        NativeMultiFrameLib INSTANCE = Native.load("XJYTXFXCV_multi", NativeMultiFrameLib.class);
         int processImageWrapper(InputData.ByReference input, OutputData.ByReference output);
         void freeOutputData(OutputData.ByReference output);
     }
 
-    private CropBox.ByValue loadCropBoxFromIni(String iniFilePath) {
-        File iniFile = new File(iniFilePath);
+    private CropBox.ByValue loadCropBoxFromIni() {
+        File iniFile = new File(this.iniFilePath);
 
         if (!iniFile.exists() || !iniFile.isFile()) {
-            String errorMessage = String.format("必需的 INI 配置文件 '%s' 未找到或不是一个有效文件。", iniFilePath);
+            String errorMessage = String.format("配置文件 '%s' 未找到或不是一个有效文件。", iniFilePath);
             logger.error(errorMessage);
             throw new RuntimeException(errorMessage);
         }
@@ -104,7 +114,7 @@ public class MultiFrameProcessorCpp {
             Ini.Section regionSection = ini.get("Region");
 
             if (regionSection == null) {
-                String errorMessage = String.format("INI 文件 '%s' 中必需的 '[Region]' 部分未找到。", iniFilePath);
+                String errorMessage = String.format("配置文件 '%s' 中必需的 '[Region]' 部分未找到。", iniFilePath);
                 logger.error(errorMessage);
                 throw new RuntimeException(errorMessage);
             }
@@ -139,7 +149,7 @@ public class MultiFrameProcessorCpp {
 
 
     public MultiFrameResultResponse processDirectory(String inputDirPath, String algorithmName) {
-        logger.info("开始处理多帧目录: {}, 算法: {}", inputDirPath, algorithmName);
+        logger.info("开始处理多帧图像: {}, 算法: {}", inputDirPath, algorithmName);
 
         List<String> filePathsList;
         try (Stream<Path> paths = Files.list(Paths.get(inputDirPath))) {
@@ -160,7 +170,7 @@ public class MultiFrameProcessorCpp {
 
         String commaSeparatedFilePaths = String.join(",", filePathsList);
         int numFiles = filePathsList.size();
-        logger.info("Java层列举到 {} 个文件。准备调用C++处理。", numFiles);
+        logger.info("共有 {} 个图像文件。准备调用C++处理。", numFiles);
         logger.debug("文件列表: {}", commaSeparatedFilePaths.substring(0, Math.min(200, commaSeparatedFilePaths.length())));
 
 
@@ -169,8 +179,7 @@ public class MultiFrameProcessorCpp {
         int processStatus = -1;
         String resultOutputDir = null;
 
-        String iniFilePath = Paths.get("lib", "data.ini").toString();
-        CropBox.ByValue cropBoxConfig = loadCropBoxFromIni(iniFilePath);
+        CropBox.ByValue cropBoxConfig = loadCropBoxFromIni();
 
         try {
             inputData.mode = 1; // 多帧模式
@@ -226,8 +235,8 @@ public class MultiFrameProcessorCpp {
                 throw new RuntimeException(errorMsg);
             }
         } catch (UnsatisfiedLinkError ule) {
-            logger.error("JNA链接错误 (processImageWrapper/freeOutputData): {}", ule.getMessage(), ule);
-            throw new RuntimeException("无法链接到多帧核心处理库(process/free)。确保 XJYTXFCV_multi.dll 在路径中。", ule);
+            logger.error("JNA链接错误: {}", ule.getMessage(), ule);
+            throw new RuntimeException("无法链接到多帧核心处理库。确保 XJYTXFCV_multi 及其依赖项正确。", ule);
         }
         finally {
             if (outputData != null && outputData.getPointer() != null) {

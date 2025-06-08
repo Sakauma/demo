@@ -2,12 +2,16 @@ package com.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 public class ParseCoord {
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final Logger logger = LoggerFactory.getLogger(ParseCoord.class);
     public static Map<String, Integer> parse(String cropDataJson) {
         Map<String, Integer> coordinates = new HashMap<>();
         if (cropDataJson != null && !cropDataJson.isEmpty()) {
@@ -22,8 +26,7 @@ public class ParseCoord {
                 coordinates.put("left", left);
                 coordinates.put("top", top);
             } catch (IOException e) {
-                System.err.println("解析裁剪数据时出错 (ParseCoord): " + e.getMessage());
-                // 可以选择抛出异常或者返回空 Map
+                logger.error("解析裁剪数据时出错 (ParseCoord): {}", e.getMessage(), e);
                 return null;
             }
         }

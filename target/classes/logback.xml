@@ -6,20 +6,23 @@
         </encoder>
     </appender>
 
-    <appender name="SSE_APPENDER" class="com.demo.imgProcess.sseLogAppender">
+    <appender name="SSE_APPENDER" class="com.demo.imgProcess.SseLogAppender">
         <layout class="ch.qos.logback.classic.PatternLayout">
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{20} - %msg%n</pattern>
         </layout>
     </appender>
 
     <!-- 根据需求选择是否保留 additivity="false" -->
-    <logger name="com.demo.imgProcess.imgController" level="INFO" additivity="false">
+    <logger name="com.demo.imgProcess.ImgController" level="INFO" additivity="false">
         <appender-ref ref="SSE_APPENDER" />
     </logger>
     <logger name="com.demo.imgProcess.dto.FeatureParserService" level="INFO" additivity="false">
         <appender-ref ref="SSE_APPENDER" />
     </logger>
-    <logger name="com.demo.imgProcess.multiFrameProcessorCpp" level="INFO" additivity="false">
+    <logger name="com.demo.imgProcess.MultiFrameProcessorCpp" level="INFO" additivity="false">
+        <appender-ref ref="SSE_APPENDER" />
+    </logger>
+    <logger name="com.demo.imgProcess.ImgProcessorCpp" level="INFO" additivity="false">
         <appender-ref ref="SSE_APPENDER" />
     </logger>
 

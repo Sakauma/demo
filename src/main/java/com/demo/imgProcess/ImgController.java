@@ -80,9 +80,6 @@ public class ImgController {
             logger.info("MD5校验成功.");
 
             String originalFilename = file.getOriginalFilename();
-            String processedBase64ForCpp;
-            String originalBase64ForCpp;
-
             ConvertDatToImg.ConvertResult conversionResult = ConvertDatToImg.convertToPngBase64(file.getBytes(), originalFilename, rows, cols);
             if (conversionResult == null || conversionResult.normalizedBase64 == null) {
                 logger.error("文件转换为 Base64 PNG 失败: {}", originalFilename);
@@ -90,68 +87,38 @@ public class ImgController {
                 responseMap.put("error", "文件转换处理失败。可能由于行列数与.dat文件不匹配。");
                 return ResponseEntity.badRequest().body(responseMap);
             }
-            originalBase64ForCpp = conversionResult.normalizedBase64;
-            processedBase64ForCpp = originalBase64ForCpp;
+            String originalBase64ForCpp = conversionResult.normalizedBase64;
+            String processedBase64ForCpp = originalBase64ForCpp;
 
             Map<String, Integer> cropCoordinates = ParseCoord.parse(cropDataJson);
             if (cropCoordinates != null && !cropCoordinates.isEmpty()) {
                 logger.info("进行图像裁剪: {}", cropCoordinates);
                 processedBase64ForCpp = CropImg.cropImage(originalBase64ForCpp, cropCoordinates);
-                if (processedBase64ForCpp == null) {
-                    logger.error("图像裁剪返回null: {}", originalFilename);
-                    responseMap.put("success", false);
-                    responseMap.put("error", "图像裁剪失败。");
-                    return ResponseEntity.badRequest().body(responseMap);
-                }
             }
 
-            logger.info("调用C++ DLL进行单帧处理，算法: {}", algorithm);
-            ImgProcessorCpp.OutputData outputData = null;
-            try {
-                outputData = singleFrameProcessor.processImageWithStruct(originalBase64ForCpp, processedBase64ForCpp, cropCoordinates, algorithm);
+            logger.info("调用服务进行单帧处理，算法: {}", algorithm);
 
-                if (outputData == null || outputData.getPointer() == null ) {
-                    logger.error("C++ 单帧处理返回空的 OutputData");
-                    responseMap.put("success", false);
-                    responseMap.put("error", "C++单帧处理返回空结果");
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseMap);
-                }
+            ImgProcessorCpp.SingleFrameResult result = singleFrameProcessor.processImage(originalBase64ForCpp, processedBase64ForCpp, cropCoordinates, algorithm);
 
+            if (result.isSuccess()) {
                 responseMap.put("success", true);
-                responseMap.put("processedImage", outputData.processedBase64);
+                responseMap.put("processedImage", result.getProcessedBase64());
                 responseMap.put("algorithm", algorithm);
                 responseMap.put("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
-                responseMap.put("result", outputData.getResult());
-                responseMap.put("result_length", outputData.result_length);
-                responseMap.put("message", outputData.message != null ? outputData.message : "处理成功");
+                responseMap.put("result", result.getResultArray());
+                responseMap.put("result_length", result.getResultLength());
+                responseMap.put("message", result.getMessage() != null ? result.getMessage() : "处理成功");
 
                 logger.info("单帧识别请求处理完成: {}", originalFilename);
                 return ResponseEntity.ok(responseMap);
-
-            } finally {
-                if (outputData != null && outputData.getPointer() != null) {
-                    try {
-                        ImgProcessorCpp.ImageProcessingLibrary.INSTANCE.freeOutputData(
-                                (ImgProcessorCpp.OutputData.ByReference) outputData
-                        );
-                        logger.debug("已释放单帧OutputData内存 (Controller): {}", outputData.getPointer());
-                    } catch (Exception e) {
-                        logger.error("释放单帧OutputData内存时出错 (Controller)", e);
-                    }
-                }
+            } else {
+                // 如果处理失败，从 DTO 中获取错误信息
+                responseMap.put("success", false);
+                responseMap.put("error", result.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseMap);
             }
 
-        } catch (NoSuchAlgorithmException e) {
-            logger.error("MD5算法不可用", e);
-            responseMap.put("success", false);
-            responseMap.put("error", "MD5算法不可用。");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseMap);
-        } catch (IOException e) {
-            logger.error("文件读写或转换错误: {}", e.getMessage(), e);
-            responseMap.put("success", false);
-            responseMap.put("error", "文件处理时发生IO错误。");
-            return ResponseEntity.badRequest().body(responseMap);
-        } catch (Exception e) {
+        } catch (Exception e) { // 这个 catch 块现在只处理 Controller 层的异常
             logger.error("单帧处理时发生未知错误: {}", e.getMessage(), e);
             responseMap.put("success", false);
             responseMap.put("error", "服务器内部未知错误。");
@@ -304,7 +271,6 @@ public class ImgController {
             );
         }
     }
-
 
     private String calculateMD5(byte[] fileBytes) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("MD5");

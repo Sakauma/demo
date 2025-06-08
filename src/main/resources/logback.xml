@@ -22,6 +22,9 @@
     <logger name="com.demo.imgProcess.MultiFrameProcessorCpp" level="INFO" additivity="false">
         <appender-ref ref="SSE_APPENDER" />
     </logger>
+    <logger name="com.demo.imgProcess.ImgProcessorCpp" level="INFO" additivity="false">
+        <appender-ref ref="SSE_APPENDER" />
+    </logger>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE" />
