@@ -25,6 +25,9 @@
     <logger name="com.demo.imgProcess.ImgProcessorCpp" level="INFO" additivity="true">
         <appender-ref ref="SSE_APPENDER" />
     </logger>
+    <logger name="com.demo.imgProcess.service.ConfigService" level="INFO" additivity="true">
+        <appender-ref ref="SSE_APPENDER" />
+    </logger>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE" />

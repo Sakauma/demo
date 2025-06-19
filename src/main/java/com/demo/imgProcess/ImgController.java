@@ -279,12 +279,17 @@ public class ImgController {
 
     @GetMapping("/config")
     public ResponseEntity<ConfigDto> getConfig() {
-        return ResponseEntity.ok(configService.getConfig());
+        logger.info("收到获取配置请求.");
+        ConfigDto config = configService.getConfig();
+        logger.info("成功获取配置: {}", config);
+        return ResponseEntity.ok(config);
     }
 
     @PostMapping("/config")
     public ResponseEntity<Void> saveConfig(@RequestBody ConfigDto configDto) {
+        logger.info("收到保存配置请求: {}", configDto);
         configService.saveConfig(configDto);
+        logger.info("配置保存成功.");
         return ResponseEntity.ok().build();
     }
 

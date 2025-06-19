@@ -28,6 +28,7 @@ public class ConfigService {
 
     public ConfigDto getConfig() {
         // 优先从数据库读取
+        logger.debug("尝试从数据库加载配置 (ID: {}).", CONFIG_ID);
         Optional<ConfigEntity> entityOptional = configRepository.findById(CONFIG_ID);
         if (entityOptional.isPresent()) {
             logger.info("从数据库加载配置。");
@@ -41,6 +42,7 @@ public class ConfigService {
 
     @Transactional
     public void saveConfig(ConfigDto dto) {
+        logger.info("准备保存配置到数据库. DTO: {}", dto);
         ConfigEntity entity = configRepository.findById(CONFIG_ID).orElse(new ConfigEntity());
         entity.setId(CONFIG_ID);
         // 更新 Entity
@@ -60,11 +62,19 @@ public class ConfigService {
     private ConfigDto readFromIniFile() {
         try {
             File iniFile = new File(iniFilePath);
-            if (!iniFile.exists()) throw new IOException("INI file not found at " + iniFilePath);
+            if (!iniFile.exists()) {
+                logger.error("INI 文件未找到: {}", iniFilePath);
+                throw new IOException("INI file not found at " + iniFilePath); //
+            }
 
             Ini ini = new Ini(new FileReader(iniFile));
             Ini.Section region = ini.get("Region");
             Ini.Section algorithm = ini.get("ALGORITHM");
+
+            if (region == null || algorithm == null) {
+                logger.error("INI 文件 {} 中缺少必要的 [Region] 或 [ALGORITHM] 部分.", iniFilePath);
+                throw new IOException("Missing required sections [Region] or [ALGORITHM] in INI file.");
+            }
 
             ConfigDto dto = new ConfigDto();
             dto.setRegion(new ConfigDto.Region());
@@ -77,9 +87,12 @@ public class ConfigService {
             dto.getAlgorithm().setLr(algorithm.get("lr", double.class));
 
             return dto;
-        } catch (IOException e) {
-            logger.error("读取 .ini 配置文件失败: {}", e.getMessage());
+        } catch (IOException e) { //
+            logger.error("读取 .ini 配置文件 {} 失败: {}", iniFilePath, e.getMessage(), e);
             throw new RuntimeException("读取配置文件失败", e);
+        } catch (Exception e) {
+            logger.error("解析 .ini 配置文件 {} 时发生错误: {}", iniFilePath, e.getMessage(), e);
+            throw new RuntimeException("解析配置文件失败", e);
         }
     }
 
