@@ -1,4 +1,5 @@
 package com.demo.imgProcess;
+import com.demo.imgProcess.dto.ConfigDto;
 
 import com.utils.ConvertDatToImg;
 import com.utils.CropImg;
@@ -7,6 +8,7 @@ import com.demo.imgProcess.dto.FolderPathRequest;
 import com.demo.imgProcess.dto.MultiFrameResultResponse;
 import com.demo.imgProcess.dto.FeatureDataResponse;
 import com.demo.imgProcess.dto.FeatureParserService;
+import com.demo.imgProcess.service.ConfigService;
 
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
@@ -39,14 +41,17 @@ public class ImgController {
     private final ImgProcessorCpp singleFrameProcessor;
     private final MultiFrameProcessorCpp multiFrameProcessor;
     private final FeatureParserService featureParserService;
+    private final ConfigService configService;
 
     @Autowired
     public ImgController(ImgProcessorCpp singleFrameProcessor,
                          MultiFrameProcessorCpp multiFrameProcessor,
-                         FeatureParserService featureParserService) {
+                         FeatureParserService featureParserService,
+                         ConfigService configService) {
         this.singleFrameProcessor = singleFrameProcessor;
         this.multiFrameProcessor = multiFrameProcessor;
         this.featureParserService = featureParserService;
+        this.configService = configService;
     }
 
     @PostMapping("/infer")
@@ -270,6 +275,17 @@ public class ImgController {
                     new FeatureDataResponse(false, msg, null)
             );
         }
+    }
+
+    @GetMapping("/config")
+    public ResponseEntity<ConfigDto> getConfig() {
+        return ResponseEntity.ok(configService.getConfig());
+    }
+
+    @PostMapping("/config")
+    public ResponseEntity<Void> saveConfig(@RequestBody ConfigDto configDto) {
+        configService.saveConfig(configDto);
+        return ResponseEntity.ok().build();
     }
 
     private String calculateMD5(byte[] fileBytes) throws NoSuchAlgorithmException {

@@ -22,3 +22,15 @@ app:
       - { name: "heights", typeChar: "i" }
   config:
     ini-path: "lib/data.ini"
+
+spring:
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    url: jdbc:sqlite:config_database.db
+  jpa:
+    database-platform: com.github.gwenn.SQLiteDialect
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        show_sql: true
