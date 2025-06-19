@@ -7,7 +7,7 @@ import lombok.Data;
 @Table(name = "app_config")
 public class ConfigEntity {
     @Id
-    private Long id = 1L; // 我们只存一条记录，ID 固定为 1
+    private Long id = 1L;
 
     private int regionX;
     private int regionY;
