@@ -1,5 +1,7 @@
 package com.utils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.util.Base64Utils;
 
 import javax.imageio.ImageIO;
@@ -13,17 +15,15 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 
-public class convertDatToImg {
 
-    //private static final int IMAGE_ROWS = 213;
-    //private static final int IMAGE_COLS = 252;
-
+public class ConvertDatToImg {
+    private static final Logger logger = LoggerFactory.getLogger(ConvertDatToImg.class);
     public static ConvertResult convertToPngBase64(byte[] datBytes, String filename, int rows, int cols) {
         try {
             String normalizedBase64 = null;
             if (filename.toLowerCase().endsWith(".dat")) {
                 if (rows <= 0 || cols <= 0) {
-                    System.err.println("Error: Invalid rows or cols provided for .dat conversion. Rows: " + rows + ", Cols: " + cols);
+                    logger.error("无效的行列数。Rows: {}, Cols: {}", rows, cols);
                     return null;
                 }
 
@@ -31,23 +31,21 @@ public class convertDatToImg {
                 DoubleBuffer doubleBuffer = buffer.asDoubleBuffer();
 
                 if (doubleBuffer.capacity() < rows * cols) { // Check if buffer has enough elements
-                    System.err.println("Error: .dat 文件数据不足以根据提供的行列数 (" + rows + "x" + cols + ") 生成图像。 Available doubles: " + doubleBuffer.capacity());
+                    logger.error(".dat 文件数据不足以生成图像。需要: {}, 可用: {}", (rows * cols), doubleBuffer.capacity());
                     return null;
                 }
                 double[] pixelDataDouble = new double[rows * cols];
                 doubleBuffer.get(pixelDataDouble, 0, rows * cols);
 
-
                 BufferedImage normalizedImage = createNormalizedImage(pixelDataDouble, rows, cols);
                 normalizedBase64 = encodeToBase64(normalizedImage);
 
                 // saveImageToLocal(normalizedImage, filename); // Optional
-
             } else {
                 ByteArrayInputStream bais = new ByteArrayInputStream(datBytes);
                 BufferedImage image = ImageIO.read(bais);
                 if (image == null) {
-                    System.err.println("Error: 无法读取图像文件: " + filename);
+                    logger.error("无法读取图像文件: {}", filename);
                     return null;
                 }
                 normalizedBase64 = encodeToBase64(image);
@@ -55,17 +53,17 @@ public class convertDatToImg {
             return new ConvertResult(normalizedBase64);
 
         } catch (IOException e) {
-            System.err.println("转换文件到 PNG 失败 (ConvertDatToImg): " + e.getMessage());
+            logger.error("转换文件到 PNG 失败 (ConvertDatToImg): {}", e.getMessage(), e);
             return null;
         } catch (NegativeArraySizeException | BufferUnderflowException e) {
-            System.err.println("读取 .dat 文件数据时出错 (可能由于行列数与文件不匹配): " + e.getMessage());
+            logger.error("读取 .dat 文件数据时出错: {}", e.getMessage(), e);
             return null;
         }
     }
 
     private static BufferedImage createNormalizedImage(double[] pixelDataFloat, int imageRows, int imageCols) {
         if (pixelDataFloat == null || pixelDataFloat.length < imageRows * imageCols) {
-            System.err.println("Error in createNormalizedImage: pixelDataFloat is null or too short for dimensions " + imageRows + "x" + imageCols);
+            logger.error("pixelDataFloat 为空或长度不足 {}x{}", imageRows, imageCols);
             return new BufferedImage(1, 1, BufferedImage.TYPE_BYTE_GRAY); // Placeholder
         }
 
@@ -112,7 +110,7 @@ public class convertDatToImg {
             outputDir.mkdirs();
         }
         ImageIO.write(image, "png", new File(localFilePath));
-        System.out.println("已将 .dat 文件转换为 PNG 并保存到: " + localFilePath);
+        logger.info("已将 .dat 文件转换为 PNG 并保存到: {}", localFilePath);
     }
 
     public static class ConvertResult { //

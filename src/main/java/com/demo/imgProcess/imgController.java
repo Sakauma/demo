@@ -1,18 +1,17 @@
 package com.demo.imgProcess;
 
-import com.utils.convertDatToImg;
-import com.utils.cropImg;
-import com.utils.parseCoord;
-import com.demo.imgProcess.dto.folderPathRequest;
-import com.demo.imgProcess.dto.multiFrameResultResponse;
-import com.demo.imgProcess.dto.featureDataResponse;
+import com.utils.ConvertDatToImg;
+import com.utils.CropImg;
+import com.utils.ParseCoord;
+import com.demo.imgProcess.dto.FolderPathRequest;
+import com.demo.imgProcess.dto.MultiFrameResultResponse;
+import com.demo.imgProcess.dto.FeatureDataResponse;
 import com.demo.imgProcess.dto.FeatureParserService;
 
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
 import java.io.FileInputStream;
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -24,7 +23,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.demo.imgProcess.dto.folderPathRequest;
 import java.io.IOException;
 import java.util.*;
 import java.text.SimpleDateFormat;
@@ -34,17 +32,17 @@ import java.security.NoSuchAlgorithmException;
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "http://localhost:8080")
-public class imgController {
+public class ImgController {
 
-    private static final Logger logger = LoggerFactory.getLogger(imgController.class);
+    private static final Logger logger = LoggerFactory.getLogger(ImgController.class);
 
     private final ImgProcessorCpp singleFrameProcessor;
-    private final multiFrameProcessorCpp multiFrameProcessor;
+    private final MultiFrameProcessorCpp multiFrameProcessor;
     private final FeatureParserService featureParserService;
 
     @Autowired
-    public imgController(ImgProcessorCpp singleFrameProcessor,
-                         multiFrameProcessorCpp multiFrameProcessor,
+    public ImgController(ImgProcessorCpp singleFrameProcessor,
+                         MultiFrameProcessorCpp multiFrameProcessor,
                          FeatureParserService featureParserService) {
         this.singleFrameProcessor = singleFrameProcessor;
         this.multiFrameProcessor = multiFrameProcessor;
@@ -82,78 +80,45 @@ public class imgController {
             logger.info("MD5校验成功.");
 
             String originalFilename = file.getOriginalFilename();
-            String processedBase64ForCpp;
-            String originalBase64ForCpp;
-
-            convertDatToImg.ConvertResult conversionResult = convertDatToImg.convertToPngBase64(file.getBytes(), originalFilename, rows, cols);
+            ConvertDatToImg.ConvertResult conversionResult = ConvertDatToImg.convertToPngBase64(file.getBytes(), originalFilename, rows, cols);
             if (conversionResult == null || conversionResult.normalizedBase64 == null) {
                 logger.error("文件转换为 Base64 PNG 失败: {}", originalFilename);
                 responseMap.put("success", false);
                 responseMap.put("error", "文件转换处理失败。可能由于行列数与.dat文件不匹配。");
                 return ResponseEntity.badRequest().body(responseMap);
             }
-            originalBase64ForCpp = conversionResult.normalizedBase64;
-            processedBase64ForCpp = originalBase64ForCpp;
+            String originalBase64ForCpp = conversionResult.normalizedBase64;
+            String processedBase64ForCpp = originalBase64ForCpp;
 
-            Map<String, Integer> cropCoordinates = parseCoord.parse(cropDataJson);
+            Map<String, Integer> cropCoordinates = ParseCoord.parse(cropDataJson);
             if (cropCoordinates != null && !cropCoordinates.isEmpty()) {
                 logger.info("进行图像裁剪: {}", cropCoordinates);
-                processedBase64ForCpp = cropImg.cropImage(originalBase64ForCpp, cropCoordinates);
-                if (processedBase64ForCpp == null) {
-                    logger.error("图像裁剪返回null: {}", originalFilename);
-                    responseMap.put("success", false);
-                    responseMap.put("error", "图像裁剪失败。");
-                    return ResponseEntity.badRequest().body(responseMap);
-                }
+                processedBase64ForCpp = CropImg.cropImage(originalBase64ForCpp, cropCoordinates);
             }
 
-            logger.info("调用C++ DLL进行单帧处理，算法: {}", algorithm);
-            ImgProcessorCpp.OutputData outputData = null;
-            try {
-                outputData = singleFrameProcessor.processImageWithStruct(originalBase64ForCpp, processedBase64ForCpp, cropCoordinates, algorithm);
+            logger.info("调用服务进行单帧处理，算法: {}", algorithm);
 
-                if (outputData == null || outputData.getPointer() == null ) {
-                    logger.error("C++ 单帧处理返回空的 OutputData");
-                    responseMap.put("success", false);
-                    responseMap.put("error", "C++单帧处理返回空结果");
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseMap);
-                }
+            ImgProcessorCpp.SingleFrameResult result = singleFrameProcessor.processImage(originalBase64ForCpp, processedBase64ForCpp, cropCoordinates, algorithm);
 
+            if (result.isSuccess()) {
                 responseMap.put("success", true);
-                responseMap.put("processedImage", outputData.processedBase64);
+                responseMap.put("processedImage", result.getProcessedBase64());
                 responseMap.put("algorithm", algorithm);
                 responseMap.put("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
-                responseMap.put("result", outputData.getResult());
-                responseMap.put("result_length", outputData.result_length);
-                responseMap.put("message", outputData.message != null ? outputData.message : "处理成功");
+                responseMap.put("result", result.getResultArray());
+                responseMap.put("result_length", result.getResultLength());
+                responseMap.put("message", result.getMessage() != null ? result.getMessage() : "处理成功");
 
                 logger.info("单帧识别请求处理完成: {}", originalFilename);
                 return ResponseEntity.ok(responseMap);
-
-            } finally {
-                if (outputData != null && outputData.getPointer() != null) {
-                    try {
-                        ImgProcessorCpp.ImageProcessingLibrary.INSTANCE.freeOutputData(
-                                (ImgProcessorCpp.OutputData.ByReference) outputData
-                        );
-                        logger.debug("已释放单帧OutputData内存 (Controller): {}", outputData.getPointer());
-                    } catch (Exception e) {
-                        logger.error("释放单帧OutputData内存时出错 (Controller)", e);
-                    }
-                }
+            } else {
+                // 如果处理失败，从 DTO 中获取错误信息
+                responseMap.put("success", false);
+                responseMap.put("error", result.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseMap);
             }
 
-        } catch (NoSuchAlgorithmException e) {
-            logger.error("MD5算法不可用", e);
-            responseMap.put("success", false);
-            responseMap.put("error", "MD5算法不可用。");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseMap);
-        } catch (IOException e) {
-            logger.error("文件读写或转换错误: {}", e.getMessage(), e);
-            responseMap.put("success", false);
-            responseMap.put("error", "文件处理时发生IO错误。");
-            return ResponseEntity.badRequest().body(responseMap);
-        } catch (Exception e) {
+        } catch (Exception e) { // 这个 catch 块现在只处理 Controller 层的异常
             logger.error("单帧处理时发生未知错误: {}", e.getMessage(), e);
             responseMap.put("success", false);
             responseMap.put("error", "服务器内部未知错误。");
@@ -162,7 +127,7 @@ public class imgController {
     }
 
     @PostMapping("/infer_folder_path")
-    public ResponseEntity<multiFrameResultResponse> handleMultiFrameFolderInference(@RequestBody folderPathRequest requestBody) {
+    public ResponseEntity<MultiFrameResultResponse> handleMultiFrameFolderInference(@RequestBody FolderPathRequest requestBody) {
         String folderPath = requestBody.getFolderPath();
         String algorithm = requestBody.getAlgorithm();
 
@@ -172,12 +137,12 @@ public class imgController {
                 algorithm == null || algorithm.trim().isEmpty()) {
             logger.warn("多帧请求参数无效: folderPath或algorithm为空");
             return ResponseEntity.badRequest().body(
-                    new multiFrameResultResponse(false, null, null, "folderPath 和 algorithm 参数不能为空", null)
+                    new MultiFrameResultResponse(false, null, null, "folderPath 和 algorithm 参数不能为空", null)
             );
         }
 
         try {
-            multiFrameResultResponse result = multiFrameProcessor.processDirectory(folderPath, algorithm);
+            MultiFrameResultResponse result = multiFrameProcessor.processDirectory(folderPath, algorithm);
 
             if (result != null && result.isSuccess()) {
                 logger.info("多帧识别成功，结果输出目录: {}", result.getResultPath());
@@ -186,25 +151,25 @@ public class imgController {
                 String errorMessage = (result != null && result.getMessage() != null) ? result.getMessage() : "核心处理模块未能成功生成结果或处理失败。";
                 logger.error("多帧识别处理失败: {}", errorMessage);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                        new multiFrameResultResponse(false, null, null, errorMessage, null)
+                        new MultiFrameResultResponse(false, null, null, errorMessage, null)
                 );
             }
         } catch (UnsatisfiedLinkError ule) {
             logger.error("JNA链接错误 (调用MultiFrameProcessorService时): {}", ule.getMessage(), ule);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    new multiFrameResultResponse(false, null, null, "无法链接到多帧核心处理库: " + ule.getMessage(), null)
+                    new MultiFrameResultResponse(false, null, null, "无法链接到多帧核心处理库: " + ule.getMessage(), null)
             );
         }
         catch (RuntimeException e) {
             logger.error("多帧处理业务逻辑错误: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    new multiFrameResultResponse(false, null, null, "多帧处理失败: " + e.getMessage(), null)
+                    new MultiFrameResultResponse(false, null, null, "多帧处理失败: " + e.getMessage(), null)
             );
         }
         catch (Exception e) { // 更通用的捕获
             logger.error("处理多帧识别请求时发生未知内部错误: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    new multiFrameResultResponse(false, null, null, "服务器内部未知错误: " + e.getMessage(), null)
+                    new MultiFrameResultResponse(false, null, null, "服务器内部未知错误: " + e.getMessage(), null)
             );
         }
     }
@@ -249,15 +214,15 @@ public class imgController {
         }
     }
 
-    // imgController.java
+    // ImgController.java
     @GetMapping("/get_feature_data")
-    public ResponseEntity<featureDataResponse> getFeatureData(@RequestParam("resultPath") String resultPathArg) { // DTO类名featureDataResponse应为FeatureDataResponse
+    public ResponseEntity<FeatureDataResponse> getFeatureData(@RequestParam("resultPath") String resultPathArg) { // DTO类名featureDataResponse应为FeatureDataResponse
         logger.info("--- /api/get_feature_data 端点被命中! 接收到的 resultPathArg: {} ---", resultPathArg); // 确认端点是否被命中
 
         if (resultPathArg == null || resultPathArg.trim().isEmpty()) {
             logger.warn("resultPath 参数为空或无效。");
             return ResponseEntity.badRequest().body(
-                    new featureDataResponse(false, "resultPath 参数不能为空。", null)
+                    new FeatureDataResponse(false, "resultPath 参数不能为空。", null)
             );
         }
 
@@ -274,7 +239,7 @@ public class imgController {
                 String msg = "特征文件 (Feature.dat) 未找到或不可读。检查路径: " + featureDatFileAbsolutePath.toString();
                 logger.warn(msg);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                        new featureDataResponse(false, msg, null)
+                        new FeatureDataResponse(false, msg, null)
                 );
             }
 
@@ -283,30 +248,29 @@ public class imgController {
             if (features == null || features.isEmpty()) {
                 logger.warn("特征文件解析完成，但未提取到任何特征数据 (可能 numFrames <= 0)。 文件: {}", featureDatFileAbsolutePath.toString());
                 return ResponseEntity.ok(
-                        new featureDataResponse(true, "特征文件已处理，但未包含有效数据帧或特征。", new HashMap<>())
+                        new FeatureDataResponse(true, "特征文件已处理，但未包含有效数据帧或特征。", new HashMap<>())
                 );
             }
 
             logger.info("成功提取特征数据，共 {} 个特征类型。", features.size());
             return ResponseEntity.ok(
-                    new featureDataResponse(true, "特征数据提取成功。", features)
+                    new FeatureDataResponse(true, "特征数据提取成功。", features)
             );
 
         } catch (IOException e) {
             String msg = "读取或解析特征文件时发生IO错误: " + e.getMessage();
             logger.error(msg, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    new featureDataResponse(false, msg, null)
+                    new FeatureDataResponse(false, msg, null)
             );
         } catch (Exception e) { // 捕获其他潜在的运行时异常，例如来自 featureParserSer.parseFeatureFile 的
             String msg = "处理特征数据请求时发生未知错误: " + e.getMessage();
             logger.error(msg, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    new featureDataResponse(false, msg, null)
+                    new FeatureDataResponse(false, msg, null)
             );
         }
     }
-
 
     private String calculateMD5(byte[] fileBytes) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("MD5");

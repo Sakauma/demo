@@ -1,7 +1,9 @@
 package com.demo.imgProcess.dto;
 
+import com.demo.config.FeatureProperties; // 导入新类
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired; // 导入新类
 import org.springframework.stereotype.Service;
 
 import java.io.DataInputStream;
@@ -18,24 +20,17 @@ import java.util.Map;
 public class FeatureParserService {
     private static final Logger logger = LoggerFactory.getLogger(FeatureParserService.class);
 
-    private static final List<featureDefinition> ALL_FEATURE_DEFINITIONS_ORDERED = List.of(
-            new featureDefinition("variance", 'f'),
-            new featureDefinition("mean_region", 'f'),
-            new featureDefinition("SCR", 'f'),
-            new featureDefinition("contrast", 'f'),
-            new featureDefinition("entropy", 'f'),
-            new featureDefinition("homogeneity", 'f'),
-            new featureDefinition("smoothness", 'f'),
-            new featureDefinition("skewness", 'f'),
-            new featureDefinition("kurtosis", 'f'),
-            new featureDefinition("xjy_area", 'i'),         // 整型特征示例
-            new featureDefinition("peak_cell_intensity", 'f'),
-            new featureDefinition("xjy_background_intensity", 'f'),
-            new featureDefinition("tl_xs", 'i'),
-            new featureDefinition("tl_ys", 'i'),
-            new featureDefinition("widths", 'i'),
-            new featureDefinition("heights", 'i')
-    );
+    // 定义一个 final 成员变量来保存从配置中读取的特征定义
+    private final List<FeatureDefinition> featureDefinitions;
+
+    // 通过构造函数注入 FeatureProperties
+    @Autowired
+    public FeatureParserService(FeatureProperties featureProperties) {
+        this.featureDefinitions = featureProperties.getDefinitions();
+        if (this.featureDefinitions == null || this.featureDefinitions.isEmpty()) {
+            logger.warn("未能从配置文件加载任何特征定义！");
+        }
+    }
 
     public Map<String, List<? extends Number>> parseFeatureFile(String filePath) throws IOException {
         Map<String, List<? extends Number>> allParsedFeatures = new LinkedHashMap<>();
@@ -43,9 +38,7 @@ public class FeatureParserService {
         try (FileInputStream fis = new FileInputStream(filePath);
              DataInputStream dis = new DataInputStream(fis)) {
 
-            byte[] buffer4Bytes = new byte[4]; // 用于读取4字节的整数和浮点数
-
-            // 1. 读取帧数 (num_frames)
+            byte[] buffer4Bytes = new byte[4];
             if (dis.read(buffer4Bytes) < 4) {
                 throw new IOException("无法从文件读取 num_frames (文件过短): " + filePath);
             }
@@ -54,7 +47,7 @@ public class FeatureParserService {
 
             if (numFrames <= 0) {
                 logger.warn("特征文件 '{}' 中没有有效的数据帧 (numFrames = {})。将返回空的特征集。", filePath, numFrames);
-                for (featureDefinition def : ALL_FEATURE_DEFINITIONS_ORDERED) {
+                for (FeatureDefinition def : this.featureDefinitions) { // 使用注入的列表
                     if (def.getTypeChar() == 'f') {
                         allParsedFeatures.put(def.getName(), new ArrayList<Float>());
                     } else if (def.getTypeChar() == 'i') {
@@ -64,10 +57,10 @@ public class FeatureParserService {
                 return allParsedFeatures;
             }
 
-            for (featureDefinition featureDef : ALL_FEATURE_DEFINITIONS_ORDERED) {
+            for (FeatureDefinition featureDef : this.featureDefinitions) {
                 String featureName = featureDef.getName();
                 char typeChar = featureDef.getTypeChar();
-                int typeSize = featureDef.getTypeSize(); // 应为4
+                int typeSize = featureDef.getTypeSize();
 
                 if (typeChar == 'f') {
                     List<Float> values = new ArrayList<>(numFrames);

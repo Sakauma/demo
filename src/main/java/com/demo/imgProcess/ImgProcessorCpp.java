@@ -6,18 +6,47 @@ import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Structure;
 import com.sun.jna.ptr.FloatByReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
 @Service
 public class ImgProcessorCpp {
+    private static final Logger logger = LoggerFactory.getLogger(ImgProcessorCpp.class);
+
     static {
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("windows")) {
             System.setProperty("jna.library.path", "./lib");
         }
     }
+
+    // 仿照多帧模式的dto
+    public static class SingleFrameResult {
+        private final String processedBase64;
+        private final float[] resultArray;
+        private final int resultLength;
+        private final String message;
+        private final boolean success;
+
+        public SingleFrameResult(boolean success, String processedBase64, float[] resultArray, int resultLength, String message) {
+            this.success = success;
+            this.processedBase64 = processedBase64;
+            this.resultArray = resultArray;
+            this.resultLength = resultLength;
+            this.message = message;
+        }
+
+        // Add getters for all fields
+        public String getProcessedBase64() { return processedBase64; }
+        public float[] getResultArray() { return resultArray; }
+        public int getResultLength() { return resultLength; }
+        public String getMessage() { return message; }
+        public boolean isSuccess() { return success; }
+    }
+
 
     // 定义裁剪框结构体
     public static class CropBox extends Structure {
@@ -92,67 +121,69 @@ public class ImgProcessorCpp {
     }
 
     public interface ImageProcessingLibrary extends Library {
-        String LIB_NAME = "XJYTXFXCV"; // C++ 库名
-        ImageProcessingLibrary INSTANCE = (ImageProcessingLibrary) Native.load(LIB_NAME, ImageProcessingLibrary.class);
-
+        ImageProcessingLibrary INSTANCE = (ImageProcessingLibrary) Native.load("XJYTXFXCV", ImageProcessingLibrary.class);
         int processImageWrapper(InputData.ByReference input, OutputData.ByReference output);
         void freeOutputData(OutputData.ByReference output);
     }
 
-    public String processImage(String imgBase64, String cropBase64, Map<String, Integer> cropCoordinates, String algorithm) {
-        OutputData output = processImageWithStruct(imgBase64, cropBase64, cropCoordinates, algorithm);
-        return output.processedBase64;
-    }
+    public SingleFrameResult processImage(String imgBase64, String cropBase64, Map<String, Integer> cropCoordinates, String algorithm) {
+        logger.info("开始处理单帧图像, 算法: {}", algorithm);
 
-    public OutputData processImageWithStruct(String imgBase64, String cropBase64, Map<String, Integer> cropCoordinates, String algorithm) {
         OutputData.ByReference outputData = new OutputData.ByReference();
         InputData.ByReference inputData = new InputData.ByReference();
-        int result = -1; // 初始化 result
+        int processStatus = -1;
 
         try {
             if (cropCoordinates != null && !cropCoordinates.isEmpty()) {
-                int x = cropCoordinates.getOrDefault("x", 0);
-                int y = cropCoordinates.getOrDefault("y", 0);
-                int width = cropCoordinates.getOrDefault("width", 0);
-                int height = cropCoordinates.getOrDefault("height", 0);
-                inputData.crop = new CropBox.ByValue(x, y, width, height);
+                inputData.crop = new CropBox.ByValue(
+                        cropCoordinates.getOrDefault("x", 0),
+                        cropCoordinates.getOrDefault("y", 0),
+                        cropCoordinates.getOrDefault("width", 0),
+                        cropCoordinates.getOrDefault("height", 0)
+                );
             }
             inputData.algorithmName = algorithm;
             inputData.originalBase64 = imgBase64;
             inputData.croppedBase64 = cropBase64;
 
-            // 调用 C++ 函数
-            ImageProcessingLibrary lib = ImageProcessingLibrary.INSTANCE;
-            System.out.println("Java OutputData pointer before native call: " + outputData.getPointer());
-            result = lib.processImageWrapper(inputData, outputData);
-            System.out.println("Java OutputData pointer after native call: " + outputData.getPointer());
+            logger.info("调用C++ processImageWrapper (单帧模式)...");
+            processStatus = ImageProcessingLibrary.INSTANCE.processImageWrapper(inputData, outputData);
+            logger.info("C++ processImageWrapper (单帧模式) 返回状态: {}", processStatus);
 
-            System.out.println("C++ 返回值: " + result);
+            if (processStatus == 0) {
+                logger.info("C++ (单帧) 处理成功。消息: '{}', 结果长度: {}", outputData.message, outputData.result_length);
+                logger.debug("得到的 float 数组: {}", Arrays.toString(outputData.getResult()));
 
-            if (result == 0) {
-                // 返回值为 0，执行后面的打印操作
-                System.out.println("C++ 处理后的消息: " + outputData.message);
-                System.out.println("Result length: " + outputData.result_length);
-
-                // 打印指针值
-                //System.out.println("Java processedBase64 pointer: " + outputData.processedBase64);
-                //System.out.println("Java result pointer: " + outputData.result);
-                //System.out.println("Java message pointer: " + outputData.message);
-
-                float[] resultArray = outputData.getResult();
-                System.out.println("得到的 float 数组:");
-                System.out.println(Arrays.toString(resultArray));
+                // 3. 在释放内存前，将数据复制到 DTO 中
+                return new SingleFrameResult(
+                        true,
+                        outputData.processedBase64,
+                        outputData.getResult(),
+                        outputData.result_length,
+                        outputData.message
+                );
             } else {
-                // 返回值不为 0，打印调用失败信息
-                System.out.println("调用 C++ 图像处理失败，返回值为: " + result);
-                System.out.println("C++ 错误消息: " + outputData.message); // 打印 C++ 的错误消息
+                String errorMsg = String.format("C++ (单帧) 处理失败。状态: %d, 消息: %s", processStatus, outputData.message);
+                logger.error(errorMsg);
+                // 4. 处理失败时，也返回一个包含失败信息的 DTO
+                return new SingleFrameResult(false, null, null, 0, errorMsg);
             }
-            return outputData;
-
+        } catch (UnsatisfiedLinkError ule) {
+            logger.error("JNA链接错误: {}", ule.getMessage(), ule);
+            String errorMsg = "无法链接到单帧核心处理库。确保 XJYTXFXCV 及其依赖项正确。";
+            return new SingleFrameResult(false, null, null, 0, errorMsg);
         } finally {
-            // 重要：释放 C++ 分配的内存
-            // ImageProcessingLibrary lib = ImageProcessingLibrary.INSTANCE;
-            //lib.freeOutputData(outputData);
+            if (outputData != null && outputData.getPointer() != null) {
+                try {
+                    ImageProcessingLibrary.INSTANCE.freeOutputData(outputData);
+                    logger.info("已调用 freeOutputData (单帧) 清理 OutputData。");
+                } catch (Exception e) {
+                    logger.error("调用 freeOutputData (单帧) 时发生错误。", e);
+                }
+            }
         }
     }
 }
+
+
+
