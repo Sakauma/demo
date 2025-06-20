@@ -1,6 +1,6 @@
-package com.demo.imgProcess.repository;
+package com.demo.repository;
 
-import com.demo.imgProcess.entity.ConfigEntity;
+import com.demo.entity.ConfigEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

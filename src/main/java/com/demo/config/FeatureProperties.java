@@ -1,6 +1,6 @@
 package com.demo.config;
 
-import com.demo.imgProcess.dto.FeatureDefinition;
+import com.demo.dto.FeatureDefinition;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import java.util.List;

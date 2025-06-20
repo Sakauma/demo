@@ -1,4 +1,4 @@
-package com.demo.imgProcess;
+package com.demo.service.jna;
 
 import java.util.List;
 import java.util.Arrays;

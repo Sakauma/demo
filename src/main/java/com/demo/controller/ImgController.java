@@ -1,14 +1,16 @@
-package com.demo.imgProcess;
-import com.demo.imgProcess.dto.ConfigDto;
+package com.demo.controller;
+import com.demo.service.jna.ImgProcessorCpp;
+import com.demo.service.jna.MultiFrameProcessorCpp;
+import com.demo.dto.ConfigDto;
 
-import com.utils.ConvertDatToImg;
-import com.utils.CropImg;
-import com.utils.ParseCoord;
-import com.demo.imgProcess.dto.FolderPathRequest;
-import com.demo.imgProcess.dto.MultiFrameResultResponse;
-import com.demo.imgProcess.dto.FeatureDataResponse;
-import com.demo.imgProcess.dto.FeatureParserService;
-import com.demo.imgProcess.service.ConfigService;
+import com.demo.util.ConvertDatToImg;
+import com.demo.util.CropImg;
+import com.demo.util.ParseCoord;
+import com.demo.dto.FolderPathRequest;
+import com.demo.dto.MultiFrameResultResponse;
+import com.demo.dto.FeatureDataResponse;
+import com.demo.service.FeatureParserService;
+import com.demo.service.ConfigService;
 
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;

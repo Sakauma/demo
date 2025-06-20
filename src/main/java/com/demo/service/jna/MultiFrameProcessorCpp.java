@@ -1,4 +1,4 @@
-package com.demo.imgProcess;
+package com.demo.service.jna;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;
@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
-import com.demo.imgProcess.dto.MultiFrameResultResponse;
+import com.demo.dto.MultiFrameResultResponse;
 
 @Service
 public class MultiFrameProcessorCpp {

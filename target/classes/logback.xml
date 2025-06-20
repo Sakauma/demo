@@ -6,26 +6,26 @@
         </encoder>
     </appender>
 
-    <appender name="SSE_APPENDER" class="com.demo.imgProcess.SseLogAppender">
+    <appender name="SSE_APPENDER" class="com.demo.controller.SseLogAppender">
         <layout class="ch.qos.logback.classic.PatternLayout">
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{20} - %msg%n</pattern>
         </layout>
     </appender>
 
     <!-- 根据需求选择 additivity="false" -->
-    <logger name="com.demo.imgProcess.ImgController" level="INFO" additivity="true">
+    <logger name="com.demo.controller.ImgController" level="INFO" additivity="true">
         <appender-ref ref="SSE_APPENDER" />
     </logger>
-    <logger name="com.demo.imgProcess.dto.FeatureParserService" level="INFO" additivity="true">
+    <logger name="com.demo.service.FeatureParserService" level="INFO" additivity="true">
         <appender-ref ref="SSE_APPENDER" />
     </logger>
-    <logger name="com.demo.imgProcess.MultiFrameProcessorCpp" level="INFO" additivity="true">
+    <logger name="com.demo.service.jna.MultiFrameProcessorCpp" level="INFO" additivity="true">
         <appender-ref ref="SSE_APPENDER" />
     </logger>
-    <logger name="com.demo.imgProcess.ImgProcessorCpp" level="INFO" additivity="true">
+    <logger name="com.demo.service.jna.ImgProcessorCpp" level="INFO" additivity="true">
         <appender-ref ref="SSE_APPENDER" />
     </logger>
-    <logger name="com.demo.imgProcess.service.ConfigService" level="INFO" additivity="true">
+    <logger name="com.demo.service.ConfigService" level="INFO" additivity="true">
         <appender-ref ref="SSE_APPENDER" />
     </logger>
 

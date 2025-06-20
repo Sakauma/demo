@@ -1,4 +1,4 @@
-package com.demo.imgProcess;
+package com.demo.controller;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
 import ch.qos.logback.core.Layout; // 另一种格式化方式

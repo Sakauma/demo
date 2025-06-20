@@ -1,4 +1,4 @@
-package com.demo.imgProcess.entity;
+package com.demo.entity;
 import javax.persistence.*;
 import lombok.Data;
 

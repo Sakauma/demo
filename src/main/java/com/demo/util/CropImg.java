@@ -1,4 +1,4 @@
-package com.utils;
+package com.demo.util;
 
 import org.springframework.util.Base64Utils;
 

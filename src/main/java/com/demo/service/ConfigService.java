@@ -1,8 +1,8 @@
-package com.demo.imgProcess.service;
+package com.demo.service;
 
-import com.demo.imgProcess.dto.ConfigDto;
-import com.demo.imgProcess.entity.ConfigEntity;
-import com.demo.imgProcess.repository.ConfigRepository;
+import com.demo.dto.ConfigDto;
+import com.demo.entity.ConfigEntity;
+import com.demo.repository.ConfigRepository;
 import lombok.RequiredArgsConstructor;
 import org.ini4j.Ini;
 import org.slf4j.Logger;
