@@ -1,9 +1,9 @@
 package com.demo.imgProcess.dto;
 
-import com.demo.config.FeatureProperties; // 导入新类
+import com.demo.config.FeatureProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired; // 导入新类
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.DataInputStream;
