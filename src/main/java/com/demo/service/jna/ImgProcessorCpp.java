@@ -9,6 +9,7 @@ import com.sun.jna.ptr.FloatByReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import com.demo.exception.ProcessException;
 
 import java.util.Map;
 
@@ -165,19 +166,20 @@ public class ImgProcessorCpp {
             } else {
                 String errorMsg = String.format("C++ (单帧) 处理失败。状态: %d, 消息: %s", processStatus, outputData.message);
                 logger.error(errorMsg);
-                // 4. 处理失败时，也返回一个包含失败信息的 DTO
-                return new SingleFrameResult(false, null, null, 0, errorMsg);
+                //return new SingleFrameResult(false, null, null, 0, errorMsg);
+                throw new ProcessException(errorMsg);
             }
         } catch (UnsatisfiedLinkError ule) {
-            logger.error("JNA链接错误: {}", ule.getMessage(), ule);
             String errorMsg = "无法链接到单帧核心处理库。确保 XJYTXFXCV 及其依赖项正确。";
-            return new SingleFrameResult(false, null, null, 0, errorMsg);
+            logger.error("JNA链接错误: {}", ule.getMessage(), ule);
+            //return new SingleFrameResult(false, null, null, 0, errorMsg);
+            throw new ProcessException(errorMsg, ule);
         } finally {
             if (outputData != null && outputData.getPointer() != null) {
                 try {
                     ImageProcessingLibrary.INSTANCE.freeOutputData(outputData);
                     logger.info("已调用 freeOutputData (单帧) 清理 OutputData。");
-                } catch (Exception e) {
+                } catch (ProcessException e) {
                     logger.error("调用 freeOutputData (单帧) 时发生错误。", e);
                 }
             }

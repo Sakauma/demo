@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
 import com.demo.dto.MultiFrameResultResponse;
+import com.demo.exception.ProcessException;
 
 @Service
 public class MultiFrameProcessorCpp {
@@ -39,7 +40,6 @@ public class MultiFrameProcessorCpp {
 
     private final String iniFilePath;
 
-    // 通过构造函数注入配置值
     @Autowired
     public MultiFrameProcessorCpp(@Value("${app.config.ini-path}") String iniFilePath) {
         this.iniFilePath = iniFilePath;
@@ -85,7 +85,7 @@ public class MultiFrameProcessorCpp {
             }
             try {
                 return this.result.getFloatArray(0, this.result_length);
-            } catch (Exception e) {
+            } catch (ProcessException e) {
                 logger.error("尝试从 OutputData.result 读取浮点数组时出错 (长度: {}): {}", this.result_length, e.getMessage());
                 return new float[0];
             }
@@ -99,13 +99,13 @@ public class MultiFrameProcessorCpp {
         void freeOutputData(OutputData.ByReference output);
     }
 
-    private CropBox.ByValue loadCropBoxFromIni() {
+    private CropBox.ByValue loadCropBoxFromIni() throws IOException {
         File iniFile = new File(this.iniFilePath);
 
         if (!iniFile.exists() || !iniFile.isFile()) {
             String errorMessage = String.format("配置文件 '%s' 未找到或不是一个有效文件。", iniFilePath);
             logger.error(errorMessage);
-            throw new RuntimeException(errorMessage);
+            throw new IOException(errorMessage);
         }
 
         try (FileReader reader = new FileReader(iniFile)) {
@@ -116,7 +116,7 @@ public class MultiFrameProcessorCpp {
             if (regionSection == null) {
                 String errorMessage = String.format("配置文件 '%s' 中必需的 '[Region]' 部分未找到。", iniFilePath);
                 logger.error(errorMessage);
-                throw new RuntimeException(errorMessage);
+                throw new IOException(errorMessage);
             }
 
             int x = regionSection.get("x", int.class);
@@ -131,24 +131,23 @@ public class MultiFrameProcessorCpp {
         } catch (IOException e) {
             String errorMessage = String.format("读取 INI 文件 '%s' 时发生 I/O 错误: %s", iniFilePath, e.getMessage());
             logger.error(errorMessage, e);
-            throw new RuntimeException(errorMessage, e);
+            throw new IOException(errorMessage, e);
         } catch (java.util.NoSuchElementException e) {
             String errorMessage = String.format("解析 INI 文件 '%s' '[Region]' 部分时缺少必要的键 (如 x, y, width, height): %s", iniFilePath, e.getMessage());
             logger.error(errorMessage, e);
-            throw new RuntimeException(errorMessage, e);
+            throw new IOException(errorMessage, e);
         } catch (IllegalArgumentException e) {
-            String errorMessage = String.format("解析 INI 文件 '%s' '[Region]' 部分的键值时发生类型错误 (例如值不是有效整数): %s", iniFilePath, e.getMessage());
+            String errorMessage = String.format("解析 INI 文件 '%s' '[Region]' 部分的键值时发生类型错误: %s", iniFilePath, e.getMessage());
             logger.error(errorMessage, e);
-            throw new RuntimeException(errorMessage, e);
-        } catch (Exception e) {
+            throw new IOException(errorMessage, e);
+        } catch (ProcessException e) {
             String errorMessage = String.format("加载或解析 INI 文件 '%s' 时发生未知错误: %s", iniFilePath, e.getMessage());
             logger.error(errorMessage, e);
-            throw new RuntimeException(errorMessage, e);
+            throw new IOException(errorMessage, e);
         }
     }
 
-
-    public MultiFrameResultResponse processDirectory(String inputDirPath, String algorithmName) {
+    public MultiFrameResultResponse processDirectory(String inputDirPath, String algorithmName) throws IOException {
         logger.info("开始处理多帧图像: {}, 算法: {}", inputDirPath, algorithmName);
 
         List<String> filePathsList;
@@ -160,12 +159,12 @@ public class MultiFrameProcessorCpp {
                     .collect(Collectors.toList());
         } catch (IOException e) {
             logger.error("无法读取输入目录中的文件列表: {}", inputDirPath, e);
-            throw new RuntimeException("无法读取输入目录 '" + inputDirPath + "': " + e.getMessage(), e);
+            throw new ProcessException("无法读取输入目录 '" + inputDirPath + "': " + e.getMessage(), e);
         }
 
         if (filePathsList.isEmpty()) {
             logger.warn("输入目录 {} 为空或不包含文件。", inputDirPath);
-            throw new RuntimeException("指定的输入目录不包含任何文件。");
+            throw new ProcessException("指定的输入目录不包含任何文件。");
         }
 
         String commaSeparatedFilePaths = String.join(",", filePathsList);
@@ -199,7 +198,7 @@ public class MultiFrameProcessorCpp {
                 resultOutputDir = outputData.outputDir; // 从C++获取输出目录
                 if (resultOutputDir == null || resultOutputDir.trim().isEmpty()) {
                     logger.error("C++ (多帧) 处理成功但未返回有效的输出目录路径。");
-                    throw new RuntimeException("核心算法处理成功但未指定输出目录。");
+                    throw new ProcessException("核心算法处理成功但未指定输出目录。");
                 }
                 logger.info("C++ (多帧) 处理成功。消息: '{}', 输出目录: '{}'", outputData.message, resultOutputDir);
 
@@ -232,18 +231,18 @@ public class MultiFrameProcessorCpp {
                     errorMsg += ", 消息: " + outputData.message;
                 }
                 logger.error(errorMsg);
-                throw new RuntimeException(errorMsg);
+                throw new ProcessException(errorMsg);
             }
         } catch (UnsatisfiedLinkError ule) {
             logger.error("JNA链接错误: {}", ule.getMessage(), ule);
-            throw new RuntimeException("无法链接到多帧核心处理库。确保 XJYTXFCV_multi 及其依赖项正确。", ule);
+            throw new ProcessException("无法链接到多帧核心处理库。确保 XJYTXFCV_multi 及其依赖项正确。", ule);
         }
         finally {
             if (outputData != null && outputData.getPointer() != null) {
                 try {
                     NativeMultiFrameLib.INSTANCE.freeOutputData(outputData);
                     logger.info("已调用 freeOutputData (多帧) 清理 OutputData。");
-                } catch (Exception e) {
+                } catch (ProcessException e) {
                     logger.error("调用 freeOutputData (多帧) 时发生错误。", e);
                 }
             }
