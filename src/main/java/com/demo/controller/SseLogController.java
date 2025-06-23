@@ -6,8 +6,8 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import javax.annotation.PostConstruct; // For Spring Boot 2.x
-import javax.annotation.PreDestroy;  // For Spring Boot 2.x
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +18,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:8080") // 根据你的前端调整
+@CrossOrigin(origins = "http://localhost:8080")
 @RequestMapping("/sse")
 public class SseLogController {
 
@@ -35,10 +35,8 @@ public class SseLogController {
 
     @GetMapping(path = "/logs", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamClassLogs() {
-        // 永不超时。也可以设置一个合理的超时时间，例如 SseEmitter emitter = new SseEmitter(300_000L);
         SseEmitter emitter = new SseEmitter(0L);
 
-        // 添加到列表
         this.emitters.add(emitter);
         logger.info("New SSE client connected. Total clients: {}", emitters.size());
 
@@ -48,22 +46,13 @@ public class SseLogController {
             logger.info("SSE client disconnected (completed). Total clients: {}", emitters.size());
         });
         emitter.onTimeout(() -> {
-            emitter.complete(); // 确保完成
-            // this.emitters.remove(emitter); // onCompletion 会被调用
+            emitter.complete();
             logger.info("SSE client timed out. Total clients: {}", emitters.size());
         });
         emitter.onError(throwable -> {
-            emitter.completeWithError(throwable); // 确保完成
-            // this.emitters.remove(emitter); // onCompletion 应该也会被调用
+            emitter.completeWithError(throwable);
             logger.error("SSE client error: {}", throwable.getMessage());
         });
-
-        // (可选) 可以立即发送一条连接成功的消息或历史日志
-        // try {
-        //   emitter.send(SseEmitter.event().name("system").data("Connected to log stream"));
-        // } catch (IOException e) {
-        //    logger.warn("Failed to send initial connection message to SSE client", e);
-        // }
 
         return emitter;
     }
@@ -75,8 +64,7 @@ public class SseLogController {
         executor.execute(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    // 从队列中获取日志，如果队列为空，take() 会阻塞
-                    String logMessage = logQueue.take(); // 或者 poll(timeout, unit) 避免永久阻塞
+                    String logMessage = logQueue.take();
 
                     List<SseEmitter> deadEmitters = new ArrayList<>();
                     for (SseEmitter emitter : this.emitters) {
@@ -85,8 +73,6 @@ public class SseLogController {
                                     .name("log") // 事件名称
                                     .data(logMessage)); // 发送日志数据
                         } catch (Exception e) {
-                            // 通常是客户端断开了连接 (e.g., IOException or IllegalStateException)
-                            // 标记这个 emitter，后续统一移除
                             logger.warn("Failed to send log to an SSE client: {}. Marking for removal.", e.getMessage());
                             deadEmitters.add(emitter);
                         }
@@ -100,7 +86,7 @@ public class SseLogController {
                 } catch (InterruptedException e) {
                     logger.info("Log processing thread interrupted. Shutting down.");
                     Thread.currentThread().interrupt(); // 重新设置中断状态
-                    break; // 退出循环
+                    break;
                 } catch (Exception e) {
                     logger.error("Unexpected error in log processing thread", e);
                     // 避免因为意外错误导致线程退出，可以考虑短暂sleep后继续

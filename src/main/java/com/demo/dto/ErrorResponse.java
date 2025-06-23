@@ -16,5 +16,5 @@ public class ErrorResponse {
     private int status;
     private String error;
     private String message;
-    private String path; // 发生错误的请求路径
+    private String path;
 }

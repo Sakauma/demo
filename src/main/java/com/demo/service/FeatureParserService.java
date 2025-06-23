@@ -21,10 +21,8 @@ import java.util.Map;
 public class FeatureParserService {
     private static final Logger logger = LoggerFactory.getLogger(FeatureParserService.class);
 
-    // 定义一个 final 成员变量来保存从配置中读取的特征定义
     private final List<FeatureDefinition> featureDefinitions;
 
-    // 通过构造函数注入 FeatureProperties
     @Autowired
     public FeatureParserService(FeatureProperties featureProperties) {
         this.featureDefinitions = featureProperties.getDefinitions();
@@ -48,7 +46,7 @@ public class FeatureParserService {
 
             if (numFrames <= 0) {
                 logger.warn("特征文件 '{}' 中没有有效的数据帧 (numFrames = {})。将返回空的特征集。", filePath, numFrames);
-                for (FeatureDefinition def : this.featureDefinitions) { // 使用注入的列表
+                for (FeatureDefinition def : this.featureDefinitions) {
                     if (def.getTypeChar() == 'f') {
                         allParsedFeatures.put(def.getName(), new ArrayList<Float>());
                     } else if (def.getTypeChar() == 'i') {
