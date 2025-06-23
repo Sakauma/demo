@@ -5,13 +5,11 @@ import com.sun.jna.Native;
 import com.sun.jna.Structure;
 import com.sun.jna.Pointer;
 
-import org.ini4j.Ini;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +24,8 @@ import org.springframework.beans.factory.annotation.Value;
 
 import com.demo.dto.MultiFrameResultResponse;
 import com.demo.exception.ProcessException;
+import com.demo.service.ConfigService;
+import com.demo.dto.ConfigDto;
 
 @Service
 public class MultiFrameProcessorCpp {
@@ -37,13 +37,12 @@ public class MultiFrameProcessorCpp {
     }
 
     private static final Logger logger = LoggerFactory.getLogger(MultiFrameProcessorCpp.class);
-
-    private final String iniFilePath;
+    private final ConfigService configService;
 
     @Autowired
-    public MultiFrameProcessorCpp(@Value("${app.config.ini-path}") String iniFilePath) {
-        this.iniFilePath = iniFilePath;
-        logger.info("配置文件路径已加载: {}", this.iniFilePath);
+    public MultiFrameProcessorCpp(ConfigService configService) {
+        this.configService = configService;
+        logger.info("ConfigService 已注入到 MultiFrameProcessorCpp。");
     }
 
     public static class CropBox extends Structure {
@@ -99,53 +98,53 @@ public class MultiFrameProcessorCpp {
         void freeOutputData(OutputData.ByReference output);
     }
 
-    private CropBox.ByValue loadCropBoxFromIni() throws IOException {
-        File iniFile = new File(this.iniFilePath);
-
-        if (!iniFile.exists() || !iniFile.isFile()) {
-            String errorMessage = String.format("配置文件 '%s' 未找到或不是一个有效文件。", iniFilePath);
-            logger.error(errorMessage);
-            throw new IOException(errorMessage);
-        }
-
-        try (FileReader reader = new FileReader(iniFile)) {
-            Ini ini = new Ini();
-            ini.load(reader);
-            Ini.Section regionSection = ini.get("Region");
-
-            if (regionSection == null) {
-                String errorMessage = String.format("配置文件 '%s' 中必需的 '[Region]' 部分未找到。", iniFilePath);
-                logger.error(errorMessage);
-                throw new IOException(errorMessage);
-            }
-
-            int x = regionSection.get("x", int.class);
-            int y = regionSection.get("y", int.class);
-            int width = regionSection.get("width", int.class);
-            int height = regionSection.get("height", int.class);
-
-            logger.info("从 INI 文件 '{}' 的 '[Region]' 部分成功加载裁剪框: x={}, y={}, width={}, height={}",
-                    iniFilePath, x, y, width, height);
-            return new CropBox.ByValue(x, y, width, height);
-
-        } catch (IOException e) {
-            String errorMessage = String.format("读取 INI 文件 '%s' 时发生 I/O 错误: %s", iniFilePath, e.getMessage());
-            logger.error(errorMessage, e);
-            throw new IOException(errorMessage, e);
-        } catch (java.util.NoSuchElementException e) {
-            String errorMessage = String.format("解析 INI 文件 '%s' '[Region]' 部分时缺少必要的键 (如 x, y, width, height): %s", iniFilePath, e.getMessage());
-            logger.error(errorMessage, e);
-            throw new IOException(errorMessage, e);
-        } catch (IllegalArgumentException e) {
-            String errorMessage = String.format("解析 INI 文件 '%s' '[Region]' 部分的键值时发生类型错误: %s", iniFilePath, e.getMessage());
-            logger.error(errorMessage, e);
-            throw new IOException(errorMessage, e);
-        } catch (ProcessException e) {
-            String errorMessage = String.format("加载或解析 INI 文件 '%s' 时发生未知错误: %s", iniFilePath, e.getMessage());
-            logger.error(errorMessage, e);
-            throw new IOException(errorMessage, e);
-        }
-    }
+//    private CropBox.ByValue loadCropBoxFromIni() throws IOException {
+//        File iniFile = new File(this.iniFilePath);
+//
+//        if (!iniFile.exists() || !iniFile.isFile()) {
+//            String errorMessage = String.format("配置文件 '%s' 未找到或不是一个有效文件。", iniFilePath);
+//            logger.error(errorMessage);
+//            throw new IOException(errorMessage);
+//        }
+//
+//        try (FileReader reader = new FileReader(iniFile)) {
+//            Ini ini = new Ini();
+//            ini.load(reader);
+//            Ini.Section regionSection = ini.get("Region");
+//
+//            if (regionSection == null) {
+//                String errorMessage = String.format("配置文件 '%s' 中必需的 '[Region]' 部分未找到。", iniFilePath);
+//                logger.error(errorMessage);
+//                throw new IOException(errorMessage);
+//            }
+//
+//            int x = regionSection.get("x", int.class);
+//            int y = regionSection.get("y", int.class);
+//            int width = regionSection.get("width", int.class);
+//            int height = regionSection.get("height", int.class);
+//
+//            logger.info("从 INI 文件 '{}' 的 '[Region]' 部分成功加载裁剪框: x={}, y={}, width={}, height={}",
+//                    iniFilePath, x, y, width, height);
+//            return new CropBox.ByValue(x, y, width, height);
+//
+//        } catch (IOException e) {
+//            String errorMessage = String.format("读取 INI 文件 '%s' 时发生 I/O 错误: %s", iniFilePath, e.getMessage());
+//            logger.error(errorMessage, e);
+//            throw new IOException(errorMessage, e);
+//        } catch (java.util.NoSuchElementException e) {
+//            String errorMessage = String.format("解析 INI 文件 '%s' '[Region]' 部分时缺少必要的键 (如 x, y, width, height): %s", iniFilePath, e.getMessage());
+//            logger.error(errorMessage, e);
+//            throw new IOException(errorMessage, e);
+//        } catch (IllegalArgumentException e) {
+//            String errorMessage = String.format("解析 INI 文件 '%s' '[Region]' 部分的键值时发生类型错误: %s", iniFilePath, e.getMessage());
+//            logger.error(errorMessage, e);
+//            throw new IOException(errorMessage, e);
+//        } catch (ProcessException e) {
+//            String errorMessage = String.format("加载或解析 INI 文件 '%s' 时发生未知错误: %s", iniFilePath, e.getMessage());
+//            logger.error(errorMessage, e);
+//            throw new IOException(errorMessage, e);
+//        }
+//    }
 
     public MultiFrameResultResponse processDirectory(String inputDirPath, String algorithmName) throws IOException {
         logger.info("开始处理多帧图像: {}, 算法: {}", inputDirPath, algorithmName);
@@ -172,13 +171,25 @@ public class MultiFrameProcessorCpp {
         logger.info("共有 {} 个图像文件。准备调用C++处理。", numFiles);
         logger.debug("文件列表: {}", commaSeparatedFilePaths.substring(0, Math.min(200, commaSeparatedFilePaths.length())));
 
+        logger.info("正在从 ConfigService 加载配置...");
+        ConfigDto config = configService.getConfig();
+        ConfigDto.Region region = config.getRegion();
+        CropBox.ByValue cropBoxConfig = new CropBox.ByValue(
+                region.getX(),
+                region.getY(),
+                region.getWidth(),
+                region.getHeight()
+        );
+        logger.info("从 ConfigService 成功加载裁剪框: x={}, y={}, width={}, height={}",
+                region.getX(), region.getY(), region.getWidth(), region.getHeight());
+
 
         InputData.ByReference inputData = new InputData.ByReference();
         OutputData.ByReference outputData = new OutputData.ByReference();
         int processStatus = -1;
         String resultOutputDir = null;
 
-        CropBox.ByValue cropBoxConfig = loadCropBoxFromIni();
+        //CropBox.ByValue cropBoxConfig = loadCropBoxFromIni();
 
         try {
             inputData.mode = 1; // 多帧模式
