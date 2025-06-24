@@ -26,7 +26,7 @@ public class ConfigService {
     private String iniFilePath;
     private static final Long CONFIG_ID = 1L;
 
-    public ConfigDto getConfig() {
+    public synchronized  ConfigDto getConfig() {
         // 优先从数据库读取
         logger.debug("尝试从数据库加载配置 (ID: {}).", CONFIG_ID);
         Optional<ConfigEntity> entityOptional = configRepository.findById(CONFIG_ID);
@@ -41,7 +41,7 @@ public class ConfigService {
     }
 
     @Transactional
-    public void saveConfig(ConfigDto dto) {
+    public synchronized void saveConfig(ConfigDto dto) {
         logger.info("准备保存配置到数据库. DTO: {}", dto);
         ConfigEntity entity = configRepository.findById(CONFIG_ID).orElse(new ConfigEntity());
         entity.setId(CONFIG_ID);
