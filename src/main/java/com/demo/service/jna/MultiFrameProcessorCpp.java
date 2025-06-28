@@ -27,9 +27,14 @@ import com.demo.exception.ProcessException;
 import com.demo.service.ConfigService;
 import com.demo.dto.ConfigDto;
 
+/**
+ * 多帧处理服务类
+ * 使用 JNA（Java Native Access）与 C++ 库交互，处理多帧图像
+ */
 @Service
 public class MultiFrameProcessorCpp {
     static {
+        // 根据操作系统设置 JNA 库路径
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("windows")) {
             System.setProperty("jna.library.path", "./lib");
@@ -45,39 +50,86 @@ public class MultiFrameProcessorCpp {
         logger.info("ConfigService 已注入到 MultiFrameProcessorCpp。");
     }
 
+    /**
+     * 定义裁剪框结构体，用于指定图像裁剪区域
+     */
     public static class CropBox extends Structure {
-        public int x; public int y; public int width; public int height;
-        public CropBox() { super(ALIGN_DEFAULT); }
-        protected List<String> getFieldOrder() { return Arrays.asList("x", "y", "width", "height"); }
+        public int x;
+        public int y;
+        public int width;
+        public int height;
+
+        public CropBox() {
+            super(ALIGN_DEFAULT); // 默认对齐方式
+        }
+
+        // 定义结构体字段的顺序
+        protected List<String> getFieldOrder() {
+            return Arrays.asList("x", "y", "width", "height");
+        }
+
+        // 定义按值传递的裁剪框结构体
         public static class ByValue extends CropBox implements Structure.ByValue {
-            public ByValue(int x, int y, int width, int height){ this.x=x; this.y=y; this.width=width; this.height=height; }
-            public ByValue(){}
+            public ByValue(int x, int y, int width, int height) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+            }
+
+            public ByValue() {
+            }
         }
     }
 
+    /**
+     * 定义输入数据结构体，包含处理多帧图像所需的所有参数
+     */
     public static class InputData extends Structure {
-        public String originalBase64;
-        public String croppedBase64;
-        public String algorithmName;
-        public int fileNum;
-        public int mode;
-        public int imgType;
-        public int id;
-        public CropBox.ByValue crop;
-        public InputData() { super(ALIGN_DEFAULT); }
-        protected List<String> getFieldOrder() { return Arrays.asList("originalBase64", "croppedBase64", "algorithmName", "fileNum", "mode", "imgType", "id", "crop"); }
-        public static class ByReference extends InputData implements Structure.ByReference {}
+        public String originalBase64; // 原始图像路径的 base64 编码
+        public String croppedBase64; // 裁剪后图像路径的 base64 编码
+        public String algorithmName; // 使用的算法名称
+        public int fileNum; // 文件数量
+        public int mode; // 处理模式
+        public int imgType; // 图像类型
+        public int id; // 请求 ID
+        public CropBox.ByValue crop; // 裁剪框参数
+
+        public InputData() {
+            super(ALIGN_DEFAULT); // 默认对齐方式
+        }
+
+        // 定义结构体字段的顺序
+        protected List<String> getFieldOrder() {
+            return Arrays.asList("originalBase64", "croppedBase64", "algorithmName", "fileNum", "mode", "imgType", "id", "crop");
+        }
+
+        // 定义按引用传递的输入数据结构体
+        public static class ByReference extends InputData implements Structure.ByReference {
+        }
     }
 
+    /**
+     * 定义输出数据结构体，包含处理结果和相关信息
+     */
     public static class OutputData extends Structure {
-        public String processedBase64;
-        public Pointer result;
-        public int result_length;
-        public String message;
-        public String outputDir;
-        public int fileNum;
-        public OutputData() { super(ALIGN_DEFAULT); }
-        protected List<String> getFieldOrder() { return Arrays.asList("processedBase64", "result", "result_length", "message", "outputDir", "fileNum"); }
+        public String processedBase64; // 处理后的图像路径的 base64 编码
+        public Pointer result; // 结果数据指针
+        public int result_length; // 结果数据长度
+        public String message; // 处理消息
+        public String outputDir; // 输出目录
+        public int fileNum; // 文件数量
+
+        public OutputData() {
+            super(ALIGN_DEFAULT); // 默认对齐方式
+        }
+
+        // 定义结构体字段的顺序
+        protected List<String> getFieldOrder() {
+            return Arrays.asList("processedBase64", "result", "result_length", "message", "outputDir", "fileNum");
+        }
+
+        // 获取结果数据数组
         public float[] getResultArray() {
             if (this.result_length <= 0 || this.result == null) {
                 return new float[0];
@@ -89,12 +141,22 @@ public class MultiFrameProcessorCpp {
                 return new float[0];
             }
         }
-        public static class ByReference extends OutputData implements Structure.ByReference {}
+
+        // 定义按引用传递的输出数据结构体
+        public static class ByReference extends OutputData implements Structure.ByReference {
+        }
     }
 
+    /**
+     * 定义本地库接口，声明需要调用的 C++ 函数
+     */
     public interface NativeMultiFrameLib extends Library {
         NativeMultiFrameLib INSTANCE = Native.load("XJYTXFXCV_multi", NativeMultiFrameLib.class);
+
+        // 声明 C++ 库中的 processImageWrapper 函数
         int processImageWrapper(InputData.ByReference input, OutputData.ByReference output);
+
+        // 声明 C++ 库中的 freeOutputData 函数
         void freeOutputData(OutputData.ByReference output);
     }
 
@@ -146,6 +208,13 @@ public class MultiFrameProcessorCpp {
 //        }
 //    }
 
+    /**
+     * 处理目录中的多帧图像
+     * @param inputDirPath 输入目录路径
+     * @param algorithmName 算法名称
+     * @return 处理结果响应对象
+     * @throws IOException 当发生I/O错误时抛出
+     */
     public MultiFrameResultResponse processDirectory(String inputDirPath, String algorithmName) throws IOException {
         logger.info("开始处理多帧图像: {}, 算法: {}", inputDirPath, algorithmName);
 

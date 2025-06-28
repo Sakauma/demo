@@ -15,22 +15,24 @@ import java.util.Map;
 
 @Service
 public class ImgProcessorCpp {
+    // 日志记录器，用于记录运行时信息
     private static final Logger logger = LoggerFactory.getLogger(ImgProcessorCpp.class);
 
     static {
+        // 初始化时设置JNA库路径，根据操作系统动态调整
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("windows")) {
             System.setProperty("jna.library.path", "./lib");
         }
     }
 
-    // 仿照多帧模式的dto
+    // 定义单帧处理结果的DTO（Data Transfer Object）
     public static class SingleFrameResult {
-        private final String processedBase64;
-        private final float[] resultArray;
-        private final int resultLength;
-        private final String message;
-        private final boolean success;
+        private final String processedBase64;  // 处理后的图像Base64编码
+        private final float[] resultArray;     // 处理结果数组
+        private final int resultLength;        // 结果数组长度
+        private final String message;          // 处理消息
+        private final boolean success;         // 处理是否成功
 
         public SingleFrameResult(boolean success, String processedBase64, float[] resultArray, int resultLength, String message) {
             this.success = success;
@@ -40,7 +42,7 @@ public class ImgProcessorCpp {
             this.message = message;
         }
 
-        // Add getters for all fields
+        // 为所有字段提供getter方法
         public String getProcessedBase64() { return processedBase64; }
         public float[] getResultArray() { return resultArray; }
         public int getResultLength() { return resultLength; }
@@ -48,8 +50,7 @@ public class ImgProcessorCpp {
         public boolean isSuccess() { return success; }
     }
 
-
-    // 定义裁剪框结构体
+    // 定义裁剪框结构体，用于传递裁剪坐标信息
     public static class CropBox extends Structure {
         public int x;
         public int y;
@@ -60,6 +61,7 @@ public class ImgProcessorCpp {
             super(ALIGN_DEFAULT);
         }
 
+        // 用于按值传递的结构体子类
         public static class ByValue extends CropBox implements Structure.ByValue {
             public ByValue(int x, int y, int width, int height) {
                 this.x = x;
@@ -76,14 +78,15 @@ public class ImgProcessorCpp {
         }
     }
 
-    // 定义输入数据的结构体
+    // 定义输入数据的结构体，用于传递给C++库
     public static class InputData extends Structure {
+        // 用于按引用传递的结构体子类
         public static class ByReference extends InputData implements Structure.ByReference {}
 
-        public String originalBase64;
-        public String croppedBase64;
-        public String algorithmName;
-        public CropBox.ByValue crop;
+        public String originalBase64;  // 原始图像Base64编码
+        public String croppedBase64;   // 裁剪后图像Base64编码
+        public String algorithmName;   // 使用的算法名称
+        public CropBox.ByValue crop;   // 裁剪框信息
 
         public InputData() {
             super(ALIGN_DEFAULT);
@@ -95,14 +98,15 @@ public class ImgProcessorCpp {
         }
     }
 
-    // 定义输出数据的结构体，输出数据可以随时添加
+    // 定义输出数据的结构体，用于接收C++库的处理结果
     public static class OutputData extends Structure {
+        // 用于按引用传递的结构体子类
         public static class ByReference extends OutputData implements Structure.ByReference {}
 
-        public String processedBase64;
-        public FloatByReference result; // 指向结果1数组的指针
-        public int result_length;     // 数组的长度
-        public String message;
+        public String processedBase64;  // 处理后的图像Base64编码
+        public FloatByReference result; // 指向结果数组的指针
+        public int result_length;       // 结果数组长度
+        public String message;          // 处理消息
 
         public OutputData() {
             super(ALIGN_DEFAULT);
@@ -113,6 +117,7 @@ public class ImgProcessorCpp {
             return Arrays.asList("processedBase64", "result", "result_length", "message");
         }
 
+        // 获取结果数组的方法
         public float[] getResult() {
             if (result == null || result_length <= 0) {
                 return new float[0];
@@ -121,12 +126,19 @@ public class ImgProcessorCpp {
         }
     }
 
+    // 定义C++库的接口
     public interface ImageProcessingLibrary extends Library {
+        // 加载C++库并获取实例
         ImageProcessingLibrary INSTANCE = (ImageProcessingLibrary) Native.load("XJYTXFXCV", ImageProcessingLibrary.class);
+
+        // 调用C++库的图像处理函数
         int processImageWrapper(InputData.ByReference input, OutputData.ByReference output);
+
+        // 释放C++库分配的输出数据内存
         void freeOutputData(OutputData.ByReference output);
     }
 
+    // 处理单帧图像的主方法
     public SingleFrameResult processImage(String imgBase64, String cropBase64, Map<String, Integer> cropCoordinates, String algorithm) {
         logger.info("开始处理单帧图像, 算法: {}", algorithm);
 
@@ -135,6 +147,7 @@ public class ImgProcessorCpp {
         int processStatus = -1;
 
         try {
+            // 设置裁剪框坐标
             if (cropCoordinates != null && !cropCoordinates.isEmpty()) {
                 inputData.crop = new CropBox.ByValue(
                         cropCoordinates.getOrDefault("x", 0),
@@ -143,6 +156,8 @@ public class ImgProcessorCpp {
                         cropCoordinates.getOrDefault("height", 0)
                 );
             }
+
+            // 设置输入数据
             inputData.algorithmName = algorithm;
             inputData.originalBase64 = imgBase64;
             inputData.croppedBase64 = cropBase64;
@@ -155,7 +170,7 @@ public class ImgProcessorCpp {
                 logger.info("C++ (单帧) 处理成功。消息: '{}', 结果长度: {}", outputData.message, outputData.result_length);
                 logger.debug("得到的 float 数组: {}", Arrays.toString(outputData.getResult()));
 
-                // 3. 在释放内存前，将数据复制到 DTO 中
+                // 在释放内存前，将数据复制到DTO中
                 return new SingleFrameResult(
                         true,
                         outputData.processedBase64,
@@ -166,15 +181,14 @@ public class ImgProcessorCpp {
             } else {
                 String errorMsg = String.format("C++ (单帧) 处理失败。状态: %d, 消息: %s", processStatus, outputData.message);
                 logger.error(errorMsg);
-                //return new SingleFrameResult(false, null, null, 0, errorMsg);
                 throw new ProcessException(errorMsg);
             }
         } catch (UnsatisfiedLinkError ule) {
             String errorMsg = "无法链接到单帧核心处理库。确保 XJYTXFXCV 及其依赖项正确。";
             logger.error("JNA链接错误: {}", ule.getMessage(), ule);
-            //return new SingleFrameResult(false, null, null, 0, errorMsg);
             throw new ProcessException(errorMsg, ule);
         } finally {
+            // 确保释放C++库分配的内存
             if (outputData != null && outputData.getPointer() != null) {
                 try {
                     ImageProcessingLibrary.INSTANCE.freeOutputData(outputData);
@@ -186,6 +200,3 @@ public class ImgProcessorCpp {
         }
     }
 }
-
-
-
