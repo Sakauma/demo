@@ -32,7 +32,10 @@ import java.text.SimpleDateFormat;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-
+/**
+ * 图像处理控制器类
+ * 提供单帧图像识别、多帧图像识别、图像获取、特征数据获取和配置管理等功能。
+ */
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "http://localhost:8080")
@@ -56,6 +59,18 @@ public class ImgController {
         this.configService = configService;
     }
 
+    /**
+     * 单帧图像识别接口。
+     * @param file 上传的图像文件
+     * @param algorithm 使用的算法
+     * @param rows 图像行数
+     * @param cols 图像列数
+     * @param cropDataJson 裁剪坐标 JSON 字符串
+     * @param fileMD5FromFrontend 前端提供的文件 MD5 校验值
+     * @return 处理结果
+     * @throws IOException 文件操作异常
+     * @throws NoSuchAlgorithmException 无效算法异常
+     */
     @PostMapping("/infer")
     public ResponseEntity<Map<String, Object>> inferImage(
             @RequestPart("file") MultipartFile file,
@@ -109,6 +124,12 @@ public class ImgController {
         return ResponseEntity.ok(responseMap);
     }
 
+    /**
+     * 多帧图像识别接口（基于文件夹路径）。
+     * @param requestBody 文件夹路径请求体
+     * @return 处理结果
+     * @throws IOException 文件操作异常
+     */
     @PostMapping("/infer_folder_path")
     public ResponseEntity<MultiFrameResultResponse> handleMultiFrameFolderInference(@RequestBody FolderPathRequest requestBody) throws IOException {
         String folderPath = requestBody.getFolderPath();
@@ -126,6 +147,13 @@ public class ImgController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * 获取图像文件接口。
+     * @param folder 图像所在文件夹路径
+     * @param file 图像文件名
+     * @return 图像文件
+     * @throws IOException 文件操作异常
+     */
     @GetMapping("/get_image")
     public ResponseEntity<?> getImage(
             @RequestParam("folder") String folder,
@@ -159,6 +187,12 @@ public class ImgController {
                 .body(resource);
     }
 
+    /**
+     * 获取特征数据接口。
+     * @param resultPathArg 结果路径参数
+     * @return 特征数据
+     * @throws IOException 文件操作异常
+     */
     @GetMapping("/get_feature_data")
     public ResponseEntity<FeatureDataResponse> getFeatureData(@RequestParam("resultPath") String resultPathArg) throws IOException {
         logger.info("--- 接收到的 resultPathArg: {} ---", resultPathArg);
@@ -192,6 +226,10 @@ public class ImgController {
         );
     }
 
+    /**
+     * 获取配置接口。
+     * @return 配置信息
+     */
     @GetMapping("/config")
     public ResponseEntity<ConfigDto> getConfig() {
         logger.info("收到获取配置请求.");
@@ -200,6 +238,11 @@ public class ImgController {
         return ResponseEntity.ok(config);
     }
 
+    /**
+     * 保存配置接口。
+     * @param configDto 配置数据传输对象
+     * @return 空响应
+     */
     @PostMapping("/config")
     public ResponseEntity<Void> saveConfig(@RequestBody ConfigDto configDto) {
         logger.info("收到保存配置请求: {}", configDto);
@@ -208,6 +251,12 @@ public class ImgController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * 计算文件的 MD5 校验值。
+     * @param fileBytes 文件字节数组
+     * @return MD5 校验值
+     * @throws NoSuchAlgorithmException 无效算法异常
+     */
     private String calculateMD5(byte[] fileBytes) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("MD5");
         byte[] digest = md.digest(fileBytes);

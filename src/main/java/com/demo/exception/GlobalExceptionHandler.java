@@ -13,6 +13,10 @@ import org.springframework.web.context.request.WebRequest;
 import java.io.IOException;
 import java.time.LocalDateTime;
 
+/**
+ * 全局异常处理器类
+ * 用于捕获和处理Spring Boot应用程序中抛出的各种异常
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

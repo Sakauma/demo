@@ -16,6 +16,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.Optional;
 
+/**
+ * 配置数据服务类
+ * 实现获取配置，保存配置，从 INI 文件读取配置，更新 INI 文件，实体与 DTO 映射
+ */
 @Service
 @RequiredArgsConstructor
 public class ConfigService {
@@ -26,7 +30,12 @@ public class ConfigService {
     private String iniFilePath;
     private static final Long CONFIG_ID = 1L;
 
-    public synchronized  ConfigDto getConfig() {
+    /**
+     * 获取配置信息，优先从数据库读取，如果数据库没有则从本地 INI 文件读取。
+     *
+     * @return ConfigDto 配置数据传输对象
+     */
+    public synchronized ConfigDto getConfig() {
         // 优先从数据库读取
         logger.debug("尝试从数据库加载配置 (ID: {}).", CONFIG_ID);
         Optional<ConfigEntity> entityOptional = configRepository.findById(CONFIG_ID);
@@ -40,6 +49,11 @@ public class ConfigService {
         }
     }
 
+    /**
+     * 保存配置到数据库，并同步更新本地 INI 文件。
+     *
+     * @param dto 配置数据传输对象
+     */
     @Transactional
     public synchronized void saveConfig(ConfigDto dto) {
         logger.info("准备保存配置到数据库. DTO: {}", dto);
@@ -59,6 +73,12 @@ public class ConfigService {
         updateIniFile(entity);
     }
 
+    /**
+     * 从本地 INI 文件读取配置。
+     *
+     * @return ConfigDto 配置数据传输对象
+     * @throws IOException 如果文件不存在或解析失败
+     */
     private ConfigDto readFromIniFile() {
         try {
             File iniFile = new File(iniFilePath);
@@ -96,6 +116,12 @@ public class ConfigService {
         }
     }
 
+    /**
+     * 更新本地 INI 文件中的配置。
+     *
+     * @param entity 配置实体对象
+     * @throws IOException 如果文件更新失败
+     */
     private void updateIniFile(ConfigEntity entity) {
         try {
             File iniFile = new File(iniFilePath);
@@ -119,6 +145,12 @@ public class ConfigService {
         }
     }
 
+    /**
+     * 将配置实体对象映射为数据传输对象。
+     *
+     * @param entity 配置实体对象
+     * @return ConfigDto 配置数据传输对象
+     */
     private ConfigDto mapEntityToDto(ConfigEntity entity) {
         ConfigDto dto = new ConfigDto();
         dto.setRegion(new ConfigDto.Region());
