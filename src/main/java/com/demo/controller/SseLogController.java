@@ -22,7 +22,6 @@ import java.util.concurrent.TimeUnit;
  * 该控制器管理所有客户端的连接，并从日志队列中获取日志消息，推送给所有连接的客户端。
  */
 @RestController
-@CrossOrigin(origins = "http://localhost:8080") // 允许来自 http://localhost:8080 的跨域请求
 @RequestMapping("/sse") // 所有请求路径以 "/sse" 开头
 public class SseLogController {
 

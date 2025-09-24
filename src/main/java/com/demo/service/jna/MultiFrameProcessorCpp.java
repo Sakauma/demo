@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -102,6 +104,7 @@ public class MultiFrameProcessorCpp {
     public static class InputData extends Structure {
         public String originalBase64; // 在多帧模式下，这是一个逗号分隔的文件绝对路径列表。
         public String croppedBase64;  // 在多帧模式下，通常与 originalBase64 相同。
+        public String resultDir;      // 保存结果路径
         public String algorithmName;  // 使用的算法名称。
         public int fileNum;           // 要处理的文件总数。
         public int mode;              // 处理模式（例如，1 代表多帧）。
@@ -115,7 +118,7 @@ public class MultiFrameProcessorCpp {
 
         // 定义字段顺序，必须与 C++ 侧一致
         protected List<String> getFieldOrder() {
-            return Arrays.asList("originalBase64", "croppedBase64", "algorithmName", "fileNum", "mode", "imgType", "id", "crop");
+            return Arrays.asList("originalBase64", "croppedBase64", "resultDir", "algorithmName", "fileNum", "mode", "imgType", "id", "crop");
         }
 
         /**
@@ -246,6 +249,21 @@ public class MultiFrameProcessorCpp {
         logger.info("从 ConfigService 成功加载裁剪框: x={}, y={}, width={}, height={}",
                 region.getX(), region.getY(), region.getWidth(), region.getHeight());
 
+        // --- 2.5 计算并准备输出路径 ---
+        Path projectRoot = getProjectRootPath();
+        Path resultPath = projectRoot.resolve("result");
+        // 确保目录存在 (C++层不做目录创建，由Java负责更安全)
+        if (!Files.exists(resultPath)) {
+            try {
+                Files.createDirectories(resultPath);
+                logger.info("结果目录不存在，已自动创建: {}", resultPath);
+            } catch (IOException e) {
+                throw new ProcessException("无法创建结果输出目录: " + resultPath, e);
+            }
+        }
+        String resultPathString = resultPath.toAbsolutePath().toString();
+        logger.info("将传递给C++的绝对输出路径: {}", resultPathString);
+
         // --- 3. 调用 C++ 库 ---
         InputData.ByReference inputData = new InputData.ByReference();
         OutputData.ByReference outputData = new OutputData.ByReference();
@@ -261,6 +279,8 @@ public class MultiFrameProcessorCpp {
             inputData.id = 0; // 未使用
             inputData.imgType = 0; // 未使用
             inputData.crop = cropBoxConfig;
+
+            inputData.resultDir = resultPathString;
 
             logger.info("调用C++ processImageWrapper (多帧模式)...");
             processStatus = NativeMultiFrameLib.INSTANCE.processImageWrapper(inputData, outputData);
@@ -324,6 +344,33 @@ public class MultiFrameProcessorCpp {
                     logger.error("调用 freeOutputData (多帧) 时发生错误。", e);
                 }
             }
+        }
+    }
+
+    /**
+     * 获取项目根目录，用于确定统一的输出路径。
+     * @return 项目根目录的Path对象
+     */
+    private Path getProjectRootPath() {
+        try {
+            URL location = MultiFrameProcessorCpp.class.getProtectionDomain().getCodeSource().getLocation();
+            Path basePath;
+            if ("jar".equals(location.getProtocol())) {
+                String jarPathString = location.toURI().getSchemeSpecificPart();
+                int bangIndex = jarPathString.indexOf('!');
+                if (bangIndex != -1) {
+                    jarPathString = jarPathString.substring(0, bangIndex);
+                }
+                Path jarFile = Paths.get(new URI(jarPathString));
+                basePath = jarFile.getParent().getParent();
+            } else {
+                Path classesPath = Paths.get(location.toURI());
+                basePath = classesPath.getParent().getParent();
+            }
+            return basePath;
+        } catch (Exception e) {
+            logger.error("无法动态确定项目根目录，将回退到使用当前工作目录。", e);
+            return Paths.get(".");
         }
     }
 }

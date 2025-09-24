@@ -13,9 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Optional;
 
 /**
@@ -159,25 +161,40 @@ public class ConfigService {
             URL location = ConfigService.class.getProtectionDomain().getCodeSource().getLocation();
             Path basePath;
 
-            if (location.getProtocol().equals("jar")) {
-                // 如果是从 jar 文件运行
-                String jarPath = location.toURI().toString();
-                // 移除 "jar:" 前缀和 "!" 及其之后的部分，得到 jar 文件的真实路径
-                jarPath = jarPath.substring("jar:file:".length(), jarPath.indexOf("!"));
-                File jarFile = new File(URLDecoder.decode(jarPath, "UTF-8"));
-                basePath = jarFile.getParentFile().toPath();
-            } else {
-                // 如果是从 IDE 运行 (protocol is "file")
-                File source = new File(URLDecoder.decode(location.getPath(), "UTF-8"));
-                basePath = source.toPath();
+            if ("jar".equals(location.getProtocol())) {
+                logger.info("检测到JAR环境，将在JAR包同级目录查找'lib'文件夹。");
+                // JAR包路径示例: "jar:file:/D:/test/target/demo.jar!/..."
+                // 我们需要提取出: "/D:/test/target/demo.jar"
+                String jarPathString = location.toURI().getSchemeSpecificPart();
+                int bangIndex = jarPathString.indexOf('!');
+                if (bangIndex != -1) {
+                    jarPathString = jarPathString.substring(0, bangIndex);
+                }
+                Path jarFile = Paths.get(new URI(jarPathString));
+
+                // 【关键逻辑 for JAR】
+                // basePath 设置为 JAR 文件所在的目录, 即 'target' 目录
+                basePath = jarFile.getParent();
+                logger.info("JAR包所在目录（基准目录）设置为: {}", basePath);
+
+            } else { // "file" protocol for IDE
+                logger.info("检测到IDE/文件环境，将在项目根目录查找'lib'文件夹。");
+                // IDE中的路径示例: "/D:/test/target/classes/"
+                Path classesPath = Paths.get(location.toURI());
+
+                // 【关键逻辑 for IDE】
+                // 从 classes 目录向上两级，找到项目根目录
+                basePath = classesPath.getParent().getParent();
+                logger.info("项目根目录（基准目录）设置为: {}", basePath);
             }
 
-            Path iniPath = basePath.resolve("lib").resolve("data.ini").toAbsolutePath();
-            logger.info("动态计算出的data.ini绝对路径为: {}", iniPath);
+            // 从计算出的基准目录解析 lib/data.ini 的最终路径
+            Path iniPath = basePath.resolve("lib").resolve("data.ini");
+            logger.info("最终计算出的 data.ini 绝对路径为: {}", iniPath.toAbsolutePath());
             return iniPath;
 
         } catch (Exception e) {
-            logger.error("无法确定应用根目录以定位data.ini", e);
+            logger.error("无法动态确定应用基准目录以定位data.ini", e);
             throw new RuntimeException("无法确定应用根目录以定位data.ini", e);
         }
     }

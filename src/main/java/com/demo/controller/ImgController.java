@@ -42,7 +42,6 @@ import java.security.NoSuchAlgorithmException;
  */
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "http://localhost:8080")
 public class ImgController {
 
     private static final Logger logger = LoggerFactory.getLogger(ImgController.class);
@@ -266,42 +265,47 @@ public class ImgController {
         try {
             URL location = ImgController.class.getProtectionDomain().getCodeSource().getLocation();
             Path basePath;
-            Path basePath_2;
+
             if ("jar".equals(location.getProtocol())) {
                 logger.info("检测到JAR环境。");
+                // 从 "jar:file:/D:/demo/target/demo.jar!/..." 提取出 JAR 文件的路径
                 String jarPathString = location.toURI().getSchemeSpecificPart();
                 int bangIndex = jarPathString.indexOf('!');
                 if (bangIndex != -1) {
                     jarPathString = jarPathString.substring(0, bangIndex);
                 }
                 Path jarFile = Paths.get(new URI(jarPathString));
-                basePath = jarFile.getParent().getParent();
-                basePath_2 = jarFile.getParent();
-                logger.info("JAR包根目录（应用基准目录）设置为: {}", basePath);
 
-            } else {
+                // 【核心逻辑 for JAR】
+                // jarFile 是 D:\demo\target\demo.jar
+                // .getParent() 是 D:\demo\target
+                // .getParent().getParent() 正是项目根目录 D:\demo
+                basePath = jarFile.getParent().getParent();
+                logger.info("项目根目录（基准目录）设置为: {}", basePath);
+
+            } else { // "file" protocol for IDE
                 logger.info("检测到IDE/文件环境。");
+                // classesPath 是 D:\demo\target\classes
                 Path classesPath = Paths.get(location.toURI());
+
+                // 【核心逻辑 for IDE】
+                // .getParent() 是 D:\demo\target
+                // .getParent().getParent() 正是项目根目录 D:\demo
                 basePath = classesPath.getParent().getParent();
-                basePath_2 = classesPath.getParent();
-                logger.info("项目根目录设置为: {}", basePath);
+                logger.info("项目根目录（基准目录）设置为: {}", basePath);
             }
 
+            // 确保在项目根目录下存在 result 文件夹
             Path resultPath = basePath.resolve("result");
             if (!Files.exists(resultPath)) {
                 Files.createDirectories(resultPath);
                 logger.info("结果目录不存在，已在基准目录下自动创建: {}", resultPath);
             }
 
-            Path resultPath_2 = basePath_2.resolve("result");
-            if (!Files.exists(resultPath_2)) {
-                Files.createDirectories(resultPath_2);
-                logger.info("结果目录2不存在，已在基准目录下自动创建: {}", resultPath_2);
-            }
-
             return basePath;
         } catch (Exception e) {
             logger.error("无法动态确定应用基准目录，将回退到使用当前工作目录。错误详情: ", e);
+            // 回退到当前工作目录，这正是C++库使用的目录，因此是可靠的。
             return Paths.get(".");
         }
     }
