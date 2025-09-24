@@ -17,11 +17,15 @@ import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.io.File;
+import java.net.URL;
+import java.net.URLDecoder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -162,7 +166,20 @@ public class ImgController {
         if (folder == null || folder.trim().isEmpty() || file == null || file.trim().isEmpty()) {
             throw new IllegalArgumentException("folder 和 file 参数不能为空。");
         }
-        Path imagePath = Paths.get(folder, file);
+        //Path imagePath = Paths.get(folder, file);
+        Path folderPath = Paths.get(folder);
+        Path imagePath;
+        if (folderPath.isAbsolute()) {
+            imagePath = folderPath.resolve(file);
+        } else {
+            Path cleanFolderPath = folderPath.getFileName();
+            if (cleanFolderPath == null) {
+                throw new IllegalArgumentException("无效的文件夹路径: " + folder);
+            }
+            imagePath = getApplicationBasePath().resolve(cleanFolderPath).resolve(file).normalize();
+        }
+        logger.info("最终尝试访问的图像文件路径: {}", imagePath.toString());
+
         logger.debug("请求图像: {}", imagePath.toString());
 
         if (!Files.exists(imagePath) || !Files.isReadable(imagePath) || Files.isDirectory(imagePath)) {
@@ -202,8 +219,19 @@ public class ImgController {
         }
 
         Path featureDatFileAbsolutePath;
-        Path relativeResultPath = Paths.get(resultPathArg);
-        featureDatFileAbsolutePath = Paths.get(".").resolve(relativeResultPath).resolve("Feature.dat").toAbsolutePath().normalize();
+        //Path relativeResultPath = Paths.get(resultPathArg);
+        //featureDatFileAbsolutePath = Paths.get(".").resolve(relativeResultPath).resolve("Feature.dat").toAbsolutePath().normalize();
+        Path resultDirectoryPath = Paths.get(resultPathArg);
+
+        if (resultDirectoryPath.isAbsolute()) {
+            featureDatFileAbsolutePath = resultDirectoryPath.resolve("Feature.dat").normalize();
+        } else {
+            Path cleanPath = resultDirectoryPath.getFileName();
+            if (cleanPath == null) {
+                throw new IllegalArgumentException("无效的结果路径: " + resultPathArg);
+            }
+            featureDatFileAbsolutePath = getApplicationBasePath().resolve(cleanPath).resolve("Feature.dat").normalize();
+        }
 
         logger.info("尝试读取和解析的特征文件绝对路径: {}", featureDatFileAbsolutePath.toString());
 
@@ -224,6 +252,58 @@ public class ImgController {
         return ResponseEntity.ok(
                 new FeatureDataResponse(true, "特征数据提取成功。", features)
         );
+    }
+
+    //TODO: 读取生成数据有问题,路径需要两个result才能生成，和c++的代码有关系
+    /**
+     * 获取应用的基准目录路径。
+     * - 在IDE中运行时，返回项目根目录 (e.g., D:\...\demo\)。
+     * - 从jar包运行时，返回jar包所在目录 (e.g., D:\...\demo\target\)。
+     *
+     * @return 应用的基准目录Path对象
+     */
+    private Path getApplicationBasePath() {
+        try {
+            URL location = ImgController.class.getProtectionDomain().getCodeSource().getLocation();
+            Path basePath;
+            Path basePath_2;
+            if ("jar".equals(location.getProtocol())) {
+                logger.info("检测到JAR环境。");
+                String jarPathString = location.toURI().getSchemeSpecificPart();
+                int bangIndex = jarPathString.indexOf('!');
+                if (bangIndex != -1) {
+                    jarPathString = jarPathString.substring(0, bangIndex);
+                }
+                Path jarFile = Paths.get(new URI(jarPathString));
+                basePath = jarFile.getParent().getParent();
+                basePath_2 = jarFile.getParent();
+                logger.info("JAR包根目录（应用基准目录）设置为: {}", basePath);
+
+            } else {
+                logger.info("检测到IDE/文件环境。");
+                Path classesPath = Paths.get(location.toURI());
+                basePath = classesPath.getParent().getParent();
+                basePath_2 = classesPath.getParent();
+                logger.info("项目根目录设置为: {}", basePath);
+            }
+
+            Path resultPath = basePath.resolve("result");
+            if (!Files.exists(resultPath)) {
+                Files.createDirectories(resultPath);
+                logger.info("结果目录不存在，已在基准目录下自动创建: {}", resultPath);
+            }
+
+            Path resultPath_2 = basePath_2.resolve("result");
+            if (!Files.exists(resultPath_2)) {
+                Files.createDirectories(resultPath_2);
+                logger.info("结果目录2不存在，已在基准目录下自动创建: {}", resultPath_2);
+            }
+
+            return basePath;
+        } catch (Exception e) {
+            logger.error("无法动态确定应用基准目录，将回退到使用当前工作目录。错误详情: ", e);
+            return Paths.get(".");
+        }
     }
 
     /**

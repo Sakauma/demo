@@ -41,7 +41,7 @@ public class MultiFrameProcessorCpp {
     static {
         // 根据操作系统设置 JNA 寻找原生库的路径
         String osName = System.getProperty("os.name").toLowerCase();
-        if (osName.contains("windows")) {
+        if (osName.contains("windows") || osName.contains("linux") ) {
             System.setProperty("jna.library.path", "./lib");
         }
     }

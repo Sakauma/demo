@@ -14,7 +14,7 @@ import com.demo.exception.ProcessException;
 import java.util.Map;
 
 /**
- * @description 单帧图像处理服务，通过 JNA (Java Native Access) 调用底层 C++ 核心库。
+ * 单帧图像处理服务，通过 JNA (Java Native Access) 调用底层 C++ 核心库。
  * 这个类是 Java 和 C++ 图像处理算法之间的桥梁。它负责：
  * 1. 定义与 C++ 库中数据结构相匹配的 Java `Structure` 类。
  * 2. 加载 C++ 动态链接库 (DLL/SO)。
@@ -32,14 +32,14 @@ public class ImgProcessorCpp {
         // 这使得 Native.load() 可以在指定目录中找到动态库文件。
         // 这里根据操作系统动态调整，以增强跨平台兼容性。
         String osName = System.getProperty("os.name").toLowerCase();
-        if (osName.contains("windows")) {
+        if (osName.contains("windows") || osName.contains("linux") ) {
             System.setProperty("jna.library.path", "./lib");
         }
         // 对于 Linux 或 macOS，可以添加相应的 else if 分支来设置路径。
     }
 
     /**
-     * @description 用于封装单帧处理结果的数据传输对象 (DTO)。
+     * 用于封装单帧处理结果的数据传输对象 (DTO)。
      * 这个类的实例是不可变的，在构造后只提供 getter 方法，保证了数据的稳定性。
      */
     public static class SingleFrameResult {
@@ -66,7 +66,7 @@ public class ImgProcessorCpp {
     }
 
     /**
-     * @description JNA 结构体，映射 C++ 中的 `CropBox` 结构体。
+     * JNA 结构体，映射 C++ 中的 `CropBox` 结构体。
      * 用于在 Java 和 C++ 之间传递图像裁剪区域的坐标和尺寸。
      */
     public static class CropBox extends Structure {
@@ -80,7 +80,7 @@ public class ImgProcessorCpp {
         }
 
         /**
-         * @description CropBox 的子类，实现了 Structure.ByValue 标记接口。
+         * CropBox 的子类，实现了 Structure.ByValue 标记接口。
          * 这告诉 JNA 当此对象作为函数参数传递时，应传递整个结构体的值（而不是指向它的指针）。
          * 这对于需要按值传递结构体的 C++ 函数至关重要。
          */
@@ -104,7 +104,7 @@ public class ImgProcessorCpp {
     }
 
     /**
-     * @description JNA 结构体，映射 C++ 中用于接收输入数据的 `InputData` 结构体。
+     * JNA 结构体，映射 C++ 中用于接收输入数据的 `InputData` 结构体。
      */
     public static class InputData extends Structure {
         /**
@@ -130,7 +130,7 @@ public class ImgProcessorCpp {
     }
 
     /**
-     * @description JNA 结构体，映射 C++ 中用于返回处理结果的 `OutputData` 结构体。
+     * JNA 结构体，映射 C++ 中用于返回处理结果的 `OutputData` 结构体。
      * C++ 函数会填充这个结构体的实例。
      */
     public static class OutputData extends Structure {
@@ -138,7 +138,7 @@ public class ImgProcessorCpp {
 
         public String processedBase64;  // C++处理后生成的图像的Base64编码。
         /**
-         * @description 指向一个由 C++ 分配的 float 数组的指针。
+         * 指向一个由 C++ 分配的 float 数组的指针。
          * 使用 FloatByReference 类型让 JNA 知道这是一个指向浮点数的指针。
          */
         public FloatByReference result;
@@ -155,7 +155,7 @@ public class ImgProcessorCpp {
         }
 
         /**
-         * @description 从 JNA 指针中安全地提取 float 数组。
+         * 从 JNA 指针中安全地提取 float 数组。
          * @return 一个包含结果数据的 float 数组，如果指针为空或长度为0，则返回空数组。
          */
         public float[] getResult() {
@@ -168,18 +168,18 @@ public class ImgProcessorCpp {
     }
 
     /**
-     * @description JNA 接口，定义了要从原生库中调用的函数。
+     * JNA 接口，定义了要从原生库中调用的函数。
      * JNA 会自动代理这个接口
      */
     public interface ImageProcessingLibrary extends Library {
         /**
-         * @description 加载指定的 C++ 动态链接库，并创建接口的实例。
+         * 加载指定的 C++ 动态链接库，并创建接口的实例。
          * "XJYTXFXCV" 是库的名称（在Windows上会自动寻找 XJYTXFXCV.dll，在Linux上是 libXJYTXFXCV.so）。
          */
         ImageProcessingLibrary INSTANCE = (ImageProcessingLibrary) Native.load("XJYTXFXCV", ImageProcessingLibrary.class);
 
         /**
-         * @description 映射 C++ 库中的 `processImageWrapper` 函数。
+         * 映射 C++ 库中的 `processImageWrapper` 函数。
          * @param input C++函数期望接收的输入数据结构体（通过指针传递）。
          * @param output C++函数将填充的结果数据结构体（通过指针传递）。
          * @return 返回一个整型状态码，通常 0 表示成功，非 0 表示失败。
@@ -187,7 +187,7 @@ public class ImgProcessorCpp {
         int processImageWrapper(InputData.ByReference input, OutputData.ByReference output);
 
         /**
-         * @description 映射 C++ 库中的 `freeOutputData` 函数。
+         * 映射 C++ 库中的 `freeOutputData` 函数。
          * 这个函数用于释放由 C++ 在 `processImageWrapper` 调用期间动态分配的内存
          * @param output 需要被释放内存的结构体。
          */
@@ -195,7 +195,7 @@ public class ImgProcessorCpp {
     }
 
     /**
-     * @description 处理单帧图像的主业务方法。
+     * 处理单帧图像的主业务方法。
      * @param imgBase64 原始图像的 Base64 字符串。
      * @param cropBase64 裁剪后图像的 Base64 字符串。
      * @param cropCoordinates 包含裁剪坐标的 Map。
