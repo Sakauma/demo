@@ -128,11 +128,41 @@ public class ImgController {
     }
 
     /**
+     * 多帧图像识别接口（基于文件上传）。
+     * 这个接口取代了旧的 /infer_folder_path，更加安全和健壮。
+     * @param files 上传的多个图像文件
+     * @param algorithm 使用的算法
+     * @return 处理结果
+     * @throws IOException 文件操作异常
+     */
+    @PostMapping("/infer_multi_frame")
+    public ResponseEntity<MultiFrameResultResponse> handleMultiFrameFileUpload(
+            @RequestPart("files") List<MultipartFile> files,
+            @RequestParam("algorithm") String algorithm) throws IOException {
+
+        logger.info("多帧识别请求 (文件上传模式): 文件数量: {}, 算法: {}", files.size(), algorithm);
+
+        if (files == null || files.isEmpty()) {
+            throw new IllegalArgumentException("必须上传至少一个文件。");
+        }
+        if (algorithm == null || algorithm.trim().isEmpty()) {
+            throw new IllegalArgumentException("algorithm 参数不能为空。");
+        }
+
+        // 调用服务层的新方法进行处理
+        MultiFrameResultResponse result = multiFrameProcessor.processUploadedFiles(files, algorithm);
+
+        logger.info("多帧识别成功 (文件上传模式)，结果输出目录: {}", result.getResultPath());
+        return ResponseEntity.ok(result);
+    }
+
+    /**
      * 多帧图像识别接口（基于文件夹路径）。
      * @param requestBody 文件夹路径请求体
      * @return 处理结果
      * @throws IOException 文件操作异常
      */
+    @Deprecated
     @PostMapping("/infer_folder_path")
     public ResponseEntity<MultiFrameResultResponse> handleMultiFrameFolderInference(@RequestBody FolderPathRequest requestBody) throws IOException {
         String folderPath = requestBody.getFolderPath();
