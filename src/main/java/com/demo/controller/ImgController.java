@@ -207,7 +207,7 @@ public class ImgController {
             }
             imagePath = getApplicationBasePath().resolve(cleanFolderPath).resolve(file).normalize();
         }
-        logger.info("最终尝试访问的图像文件路径: {}", imagePath.toString());
+        //logger.info("最终尝试访问的图像文件路径: {}", imagePath.toString());
 
         logger.debug("请求图像: {}", imagePath.toString());
 
@@ -226,7 +226,7 @@ public class ImgController {
         }
         headers.add(HttpHeaders.CONTENT_TYPE, contentType);
 
-        logger.info("提供图像文件: {}, Content-Type: {}", imagePath, contentType);
+        //logger.info("提供图像文件: {}, Content-Type: {}", imagePath, contentType);
         return ResponseEntity.ok()
                 .headers(headers)
                 .contentLength(Files.size(imagePath))

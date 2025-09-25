@@ -33,6 +33,9 @@ import com.demo.exception.ProcessException;
 import com.demo.service.ConfigService;
 import com.demo.dto.ConfigDto;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * 多帧图像处理服务，通过 JNA (Java Native Access) 与 C++ 核心库交互。
  * 这个类专门负责处理基于文件夹的多帧图像序列。它会：
@@ -306,6 +309,7 @@ public class MultiFrameProcessorCpp {
             inputData.fileNum = numFiles;
             inputData.crop = cropBoxConfig;
             inputData.resultDir = resultPathString;
+            inputData.imgType = 1;
 
             logger.info("调用C++ processImageWrapper (多帧模式)...");
             processStatus = NativeMultiFrameLib.INSTANCE.processImageWrapper(inputData, outputData);
@@ -318,27 +322,55 @@ public class MultiFrameProcessorCpp {
                 }
                 logger.info("C++ (多帧) 处理成功。消息: '{}', 输出目录: '{}'", outputData.message, resultOutputDir);
 
+                // C++成功执行后，直接从结果目录读取并排序文件名
+                List<String> generatedPngFiles;
+                try (Stream<Path> paths = Files.list(Paths.get(resultOutputDir))) {
+                    generatedPngFiles = paths
+                            .map(Path::getFileName)
+                            .map(Path::toString)
+                            .filter(name -> name.toLowerCase().endsWith(".png"))
+                            .collect(Collectors.toList());
+                }
+                // 使用自然排序对文件名进行排序
+                generatedPngFiles.sort(new NaturalOrderComparator());
+                logger.info("从结果目录 '{}' 读取并排序了 {} 个.png文件。", resultOutputDir, generatedPngFiles.size());
+
                 List<String> interestImageNames = new ArrayList<>();
-                List<String> outputImageNames = new ArrayList<>();
-
-                for (String originalRelativePath : originalFileNamesOnly) {
-                    // 假设C++的输出文件名与输入文件名（除扩展名外）保持一致
-                    String baseNameWithoutExt;
-                    int dotIndex = originalRelativePath.lastIndexOf('.');
-                    if (dotIndex != -1) {
-                        baseNameWithoutExt = originalRelativePath.substring(0, dotIndex);
-                    } else {
-                        baseNameWithoutExt = originalRelativePath;
+                // 假设 "roi_" 图像与结果图像一一对应
+                for (String pngFile : generatedPngFiles) {
+                    if (pngFile.toLowerCase().startsWith("roi_")) {
+                        // 如果已经是roi文件，则跳过，因为我们只关心主输出文件
+                        continue;
                     }
+                    // 检查是否存在对应的 roi 文件
+                    Path roiPath = Paths.get(resultOutputDir, "roi_" + pngFile);
+                    if (Files.exists(roiPath)) {
+                        interestImageNames.add("roi_" + pngFile);
+                    }
+                }
+                // 过滤掉 roi_ 开头的文件，只保留主结果文件
+                List<String> outputImageNames = generatedPngFiles.stream()
+                        .filter(name -> !name.toLowerCase().startsWith("roi_"))
+                        .collect(Collectors.toList());
 
-                    // 我们为前端构造预期的、带相对路径的结果文件名
-                    outputImageNames.add(baseNameWithoutExt + ".png");
-                    interestImageNames.add("roi_" + baseNameWithoutExt + ".png");
+                // 为每个结果帧找到它对应的原始 .dat 文件名
+                List<String> expandedOriginalNames = new ArrayList<>();
+                for (String pngName : outputImageNames) {
+                    // 移除帧号和扩展名来匹配原始文件名
+                    String pngBaseName = pngName.substring(0, pngName.lastIndexOf('_'));
+                    String originalFound = originalFileNamesOnly.stream()
+                            .map(ofn -> ofn.substring(0, ofn.lastIndexOf('.'))) // 获取原始文件的基础名
+                            .filter(ofnBase -> ofnBase.equals(pngBaseName))
+                            .findFirst()
+                            .orElse(originalFileNamesOnly.get(0)); // 如果找不到，默认用第一个
+                    expandedOriginalNames.add(originalFound + ".dat"); // 假设原始文件总是 .dat
                 }
 
+
                 MultiFrameResultResponse.ResultFiles resultFiles =
-                        new MultiFrameResultResponse.ResultFiles(originalFileNamesOnly, interestImageNames, outputImageNames);
-                // ========================================================
+                        new MultiFrameResultResponse.ResultFiles(expandedOriginalNames, interestImageNames, outputImageNames);
+
+                // --- END: NEW FILENAME GENERATION LOGIC ---
 
                 return new MultiFrameResultResponse(
                         true, resultOutputDir, resultFiles,
@@ -361,6 +393,50 @@ public class MultiFrameProcessorCpp {
             }
         }
     }
+
+//                List<String> interestImageNames = new ArrayList<>();
+//                List<String> outputImageNames = new ArrayList<>();
+//
+//                for (String originalRelativePath : originalFileNamesOnly) {
+//                    // 假设C++的输出文件名与输入文件名（除扩展名外）保持一致
+//                    String baseNameWithoutExt;
+//                    int dotIndex = originalRelativePath.lastIndexOf('.');
+//                    if (dotIndex != -1) {
+//                        baseNameWithoutExt = originalRelativePath.substring(0, dotIndex);
+//                    } else {
+//                        baseNameWithoutExt = originalRelativePath;
+//                    }
+//
+//                    // 我们为前端构造预期的、带相对路径的结果文件名
+//                    outputImageNames.add(baseNameWithoutExt + ".png");
+//                    interestImageNames.add("roi_" + baseNameWithoutExt + ".png");
+//                }
+//
+//                MultiFrameResultResponse.ResultFiles resultFiles =
+//                        new MultiFrameResultResponse.ResultFiles(originalFileNamesOnly, interestImageNames, outputImageNames);
+//                // ========================================================
+//
+//                return new MultiFrameResultResponse(
+//                        true, resultOutputDir, resultFiles,
+//                        outputData.message != null ? outputData.message : "处理成功",
+//                        outputData.fileNum
+//                );
+//            } else {
+//                String errorMsg = "C++ (多帧) 处理失败。状态: " + processStatus + ", 消息: " + outputData.message;
+//                logger.error(errorMsg);
+//                throw new ProcessException(errorMsg);
+//            }
+//        } finally {
+//            if (outputData != null && outputData.getPointer() != null) {
+//                try {
+//                    NativeMultiFrameLib.INSTANCE.freeOutputData(outputData);
+//                    logger.info("已调用 freeOutputData (多帧) 清理 OutputData。");
+//                } catch (Exception e) {
+//                    logger.error("调用 freeOutputData (多帧) 时发生错误。", e);
+//                }
+//            }
+//        }
+//    }
 
     /**
      * 处理指定目录中的所有文件，执行多帧图像识别。
@@ -437,7 +513,7 @@ public class MultiFrameProcessorCpp {
             inputData.croppedBase64 = commaSeparatedFilePaths;
             inputData.fileNum = numFiles;
             inputData.id = 0; // 未使用
-            inputData.imgType = 0; // 未使用
+            inputData.imgType = 1;
             inputData.crop = cropBoxConfig;
 
             inputData.resultDir = resultPathString;
@@ -531,6 +607,50 @@ public class MultiFrameProcessorCpp {
         } catch (Exception e) {
             logger.error("无法动态确定项目根目录，将回退到使用当前工作目录。", e);
             return Paths.get(".");
+        }
+    }
+
+    /**
+     * 【新】自定义比较器，用于实现文件名的自然排序。
+     * 例如: "file_2.png" 会排在 "file_10.png" 之前。
+     */
+    class NaturalOrderComparator implements Comparator<String> {
+        private final Pattern NUMERICAL_PATTERN = Pattern.compile("(\\D*)(\\d+)(.*)");
+
+        @Override
+        public int compare(String s1, String s2) {
+            Matcher m1 = NUMERICAL_PATTERN.matcher(s1);
+            Matcher m2 = NUMERICAL_PATTERN.matcher(s2);
+
+            while (m1.find() && m2.find()) {
+                String prefix1 = m1.group(1);
+                String prefix2 = m2.group(1);
+                if (!prefix1.equals(prefix2)) {
+                    return prefix1.compareTo(prefix2);
+                }
+
+                String numStr1 = m1.group(2);
+                String numStr2 = m2.group(2);
+                if (!numStr1.equals(numStr2)) {
+                    try {
+                        long num1 = Long.parseLong(numStr1);
+                        long num2 = Long.parseLong(numStr2);
+                        if (num1 != num2) {
+                            return Long.compare(num1, num2);
+                        }
+                    } catch (NumberFormatException e) {
+                        // Fallback to string comparison if not a valid long
+                        return numStr1.compareTo(numStr2);
+                    }
+                }
+
+                s1 = m1.group(3);
+                s2 = m2.group(3);
+                m1 = NUMERICAL_PATTERN.matcher(s1);
+                m2 = NUMERICAL_PATTERN.matcher(s2);
+            }
+
+            return s1.compareTo(s2);
         }
     }
 }
