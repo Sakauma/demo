@@ -11,6 +11,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * 功能特性配置类。
  * 这个类作为一个类型安全的配置属性持有者，用于从Spring Boot的外部配置文件
  */
+
 @Setter
 @Getter
 @Configuration
