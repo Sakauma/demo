@@ -11,6 +11,7 @@ import com.demo.dto.MultiFrameResultResponse;
 import com.demo.dto.FeatureDataResponse;
 import com.demo.service.FeatureParserService;
 import com.demo.service.ConfigService;
+import com.demo.service.FeaturePersistenceService;
 
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
@@ -50,16 +51,19 @@ public class ImgController {
     private final MultiFrameProcessorCpp multiFrameProcessor;
     private final FeatureParserService featureParserService;
     private final ConfigService configService;
+    private final FeaturePersistenceService featurePersistenceService;
 
     @Autowired
     public ImgController(ImgProcessorCpp singleFrameProcessor,
                          MultiFrameProcessorCpp multiFrameProcessor,
                          FeatureParserService featureParserService,
-                         ConfigService configService) {
+                         ConfigService configService,
+                         FeaturePersistenceService featurePersistenceService) {
         this.singleFrameProcessor = singleFrameProcessor;
         this.multiFrameProcessor = multiFrameProcessor;
         this.featureParserService = featureParserService;
         this.configService = configService;
+        this.featurePersistenceService = featurePersistenceService;
     }
 
     /**
@@ -127,58 +131,96 @@ public class ImgController {
         return ResponseEntity.ok(responseMap);
     }
 
+//    /**
+//     * 多帧图像识别接口（基于文件上传）。
+//     * 这个接口取代了旧的 /infer_folder_path，更加安全和健壮。
+//     * @param files 上传的多个图像文件
+//     * @param algorithm 使用的算法
+//     * @return 处理结果
+//     * @throws IOException 文件操作异常
+//     */
+//    @PostMapping("/infer_multi_frame")
+//    public ResponseEntity<MultiFrameResultResponse> handleMultiFrameFileUpload(
+//            @RequestPart("files") List<MultipartFile> files,
+//            @RequestParam("algorithm") String algorithm) throws IOException {
+//
+//        logger.info("多帧识别请求 (文件上传模式): 文件数量: {}, 算法: {}", files.size(), algorithm);
+//
+//        if (files == null || files.isEmpty()) {
+//            throw new IllegalArgumentException("必须上传至少一个文件。");
+//        }
+//        if (algorithm == null || algorithm.trim().isEmpty()) {
+//            throw new IllegalArgumentException("algorithm 参数不能为空。");
+//        }
+//
+//        // 调用服务层的新方法进行处理
+//        MultiFrameResultResponse result = multiFrameProcessor.processUploadedFiles(files, algorithm);
+//
+//        logger.info("多帧识别成功 (文件上传模式)，结果输出目录: {}", result.getResultPath());
+//        return ResponseEntity.ok(result);
+//    }
+
+    // 在 ImgController.java 中
+
     /**
      * 多帧图像识别接口（基于文件上传）。
-     * 这个接口取代了旧的 /infer_folder_path，更加安全和健壮。
-     * @param files 上传的多个图像文件
-     * @param algorithm 使用的算法
-     * @return 处理结果
-     * @throws IOException 文件操作异常
      */
     @PostMapping("/infer_multi_frame")
     public ResponseEntity<MultiFrameResultResponse> handleMultiFrameFileUpload(
-            @RequestPart("files") List<MultipartFile> files,
-            @RequestParam("algorithm") String algorithm) throws IOException {
+            @RequestPart("files") List<MultipartFile> imageFiles,
+            @RequestPart(value = "trackFile", required = false) MultipartFile trackFile,
+            @RequestParam("algorithm") String algorithm,
+            @RequestParam("mode") int mode) throws IOException {
 
-        logger.info("多帧识别请求 (文件上传模式): 文件数量: {}, 算法: {}", files.size(), algorithm);
+        logger.info("多帧识别请求 (文件上传模式): 图像文件数量: {}, 算法: {}, 模式: {}, 轨迹文件: {}",
+                imageFiles.size(), algorithm, mode, (trackFile != null && !trackFile.isEmpty()) ? trackFile.getOriginalFilename() : "N/A");
 
-        if (files == null || files.isEmpty()) {
-            throw new IllegalArgumentException("必须上传至少一个文件。");
+        if (imageFiles == null || imageFiles.isEmpty()) {
+            throw new IllegalArgumentException("必须上传至少一个图像文件 (files)。");
         }
         if (algorithm == null || algorithm.trim().isEmpty()) {
             throw new IllegalArgumentException("algorithm 参数不能为空。");
         }
+        // 校验 mode=2 时必须有 trackFile
+        if (mode == 2 && (trackFile == null || trackFile.isEmpty())) {
+            throw new IllegalArgumentException("模式 2 (GJDeal) 必须提供一个轨迹 (trackFile) 文件。");
+        }
 
-        // 调用服务层的新方法进行处理
-        MultiFrameResultResponse result = multiFrameProcessor.processUploadedFiles(files, algorithm);
+        // 调用服务层的新方法
+        MultiFrameResultResponse result = multiFrameProcessor.processUploadedFiles(
+                imageFiles,
+                trackFile,
+                algorithm,
+                mode
+        );
 
         logger.info("多帧识别成功 (文件上传模式)，结果输出目录: {}", result.getResultPath());
         return ResponseEntity.ok(result);
     }
 
-    /**
-     * 多帧图像识别接口（基于文件夹路径）。
-     * @param requestBody 文件夹路径请求体
-     * @return 处理结果
-     * @throws IOException 文件操作异常
-     */
-    @Deprecated
-    @PostMapping("/infer_folder_path")
-    public ResponseEntity<MultiFrameResultResponse> handleMultiFrameFolderInference(@RequestBody FolderPathRequest requestBody) throws IOException {
-        String folderPath = requestBody.getFolderPath();
-        String algorithm = requestBody.getAlgorithm();
-
-        logger.info("多帧识别请求 (路径模式): 文件夹: {}, 算法: {}", folderPath, algorithm);
-
-        if (folderPath == null || folderPath.trim().isEmpty() ||
-                algorithm == null || algorithm.trim().isEmpty()) {
-            throw new IllegalArgumentException("folderPath 和 algorithm 参数不能为空");
-        }
-        MultiFrameResultResponse result = multiFrameProcessor.processDirectory(folderPath, algorithm);
-
-        logger.info("多帧识别成功，结果输出目录: {}", result.getResultPath());
-        return ResponseEntity.ok(result);
-    }
+//    /**
+//     * 多帧图像识别接口（基于文件夹路径）。
+//     * @param requestBody 文件夹路径请求体
+//     * @return 处理结果
+//     * @throws IOException 文件操作异常
+//     */
+//    @Deprecated
+//    @PostMapping("/infer_folder_path")
+//    public ResponseEntity<MultiFrameResultResponse> handleMultiFrameFolderInference(@RequestBody FolderPathRequest requestBody) throws IOException {
+//        String folderPath = requestBody.getFolderPath();
+//        String algorithm = requestBody.getAlgorithm();
+//
+//        logger.info("多帧识别请求 (路径模式): 文件夹: {}, 算法: {}", folderPath, algorithm);
+//
+//        if (folderPath == null || folderPath.trim().isEmpty() ||
+//                algorithm == null || algorithm.trim().isEmpty()) {
+//            throw new IllegalArgumentException("folderPath 和 algorithm 参数不能为空");
+//        }
+//        MultiFrameResultResponse result = multiFrameProcessor.processDirectory(folderPath, algorithm);
+//
+//        logger.info("多帧识别成功，结果输出目录: {}", result.getResultPath());
+//        return ResponseEntity.ok(result);
+//    }
 
     /**
      * 获取图像文件接口。
@@ -239,28 +281,94 @@ public class ImgController {
      * @return 特征数据
      * @throws IOException 文件操作异常
      */
+//    @GetMapping("/get_feature_data")
+//    public ResponseEntity<FeatureDataResponse> getFeatureData(@RequestParam("resultPath") String resultPathArg) throws IOException {
+//        logger.info("--- 接收到的 resultPathArg: {} ---", resultPathArg);
+//
+//        if (resultPathArg == null || resultPathArg.trim().isEmpty()) {
+//            throw new IllegalArgumentException("resultPath 参数不能为空。");
+//        }
+//
+//        Path featureDatFileAbsolutePath;
+//        //Path relativeResultPath = Paths.get(resultPathArg);
+//        //featureDatFileAbsolutePath = Paths.get(".").resolve(relativeResultPath).resolve("Feature.dat").toAbsolutePath().normalize();
+//        Path resultDirectoryPath = Paths.get(resultPathArg);
+//
+//        if (resultDirectoryPath.isAbsolute()) {
+//            featureDatFileAbsolutePath = resultDirectoryPath.resolve("Feature.dat").normalize();
+//        } else {
+//            Path cleanPath = resultDirectoryPath.getFileName();
+//            if (cleanPath == null) {
+//                throw new IllegalArgumentException("无效的结果路径: " + resultPathArg);
+//            }
+//            featureDatFileAbsolutePath = getApplicationBasePath().resolve(cleanPath).resolve("Feature.dat").normalize();
+//        }
+//
+//        logger.info("尝试读取和解析的特征文件绝对路径: {}", featureDatFileAbsolutePath.toString());
+//
+//        if (!Files.exists(featureDatFileAbsolutePath) || !Files.isReadable(featureDatFileAbsolutePath)) {
+//            throw new java.io.FileNotFoundException("特征文件 (Feature.dat) 未找到或不可读。检查路径: " + featureDatFileAbsolutePath);
+//        }
+//
+//        Map<String, List<? extends Number>> features = this.featureParserService.parseFeatureFile(featureDatFileAbsolutePath.toString());
+//
+//        if (features == null || features.isEmpty()) {
+//            logger.warn("特征文件解析完成，但未提取到任何特征数据 (可能 numFrames <= 0)。 文件: {}", featureDatFileAbsolutePath.toString());
+//            return ResponseEntity.ok(
+//                    new FeatureDataResponse(true, "特征文件已处理，但未包含有效数据帧或特征。", new HashMap<>())
+//            );
+//        }
+//
+//        logger.info("成功提取特征数据，共 {} 个特征类型。", features.size());
+//        return ResponseEntity.ok(
+//                new FeatureDataResponse(true, "特征数据提取成功。", features)
+//        );
+//    }
     @GetMapping("/get_feature_data")
     public ResponseEntity<FeatureDataResponse> getFeatureData(@RequestParam("resultPath") String resultPathArg) throws IOException {
-        logger.info("--- 接收到的 resultPathArg: {} ---", resultPathArg);
+        logger.info("--- 接收到的 resultPathArg (图像目录): {} ---", resultPathArg);
 
         if (resultPathArg == null || resultPathArg.trim().isEmpty()) {
             throw new IllegalArgumentException("resultPath 参数不能为空。");
         }
 
         Path featureDatFileAbsolutePath;
-        //Path relativeResultPath = Paths.get(resultPathArg);
-        //featureDatFileAbsolutePath = Paths.get(".").resolve(relativeResultPath).resolve("Feature.dat").toAbsolutePath().normalize();
-        Path resultDirectoryPath = Paths.get(resultPathArg);
+        String analysisId; // [新增] 用于持久化
 
-        if (resultDirectoryPath.isAbsolute()) {
-            featureDatFileAbsolutePath = resultDirectoryPath.resolve("Feature.dat").normalize();
-        } else {
-            Path cleanPath = resultDirectoryPath.getFileName();
-            if (cleanPath == null) {
-                throw new IllegalArgumentException("无效的结果路径: " + resultPathArg);
-            }
-            featureDatFileAbsolutePath = getApplicationBasePath().resolve(cleanPath).resolve("Feature.dat").normalize();
+        // --- [修改] C++ 现在返回独立的 feature 和 img 目录 ---
+        // 我们需要从 img 目录推断出 feature 目录。
+
+        // 1. 获取项目根目录 (e.g., /path/to/project)
+        Path basePath = getApplicationBasePath();
+
+        // 2. 解析C++返回的相对路径 (e.g., ../result/img.../)
+        Path relativeImgPath = Paths.get(resultPathArg);
+
+        // 3. 转换为绝对路径 (e.g., /path/to/project/result/img.../)
+        Path absoluteImgPath = basePath.resolve(relativeImgPath).normalize();
+
+        // 4. 获取父目录 (e.g., /path/to/project/result)
+        Path absoluteParentDir = absoluteImgPath.getParent();
+
+        // 5. 获取目录名 (e.g., img2025-10-30...)
+        String imgDirName = absoluteImgPath.getFileName().toString();
+
+        // 6. 推断 feature 目录名
+        String featureDirName = imgDirName.replaceFirst("img", "feature");
+
+        if (absoluteParentDir == null || featureDirName.equals(imgDirName)) {
+            throw new IllegalArgumentException("无效的结果路径 (无法解析特征路径): " + resultPathArg);
         }
+
+        // 7. [新增] 提取 analysisId (例如 "feature2025-10-30-19-40-38")
+        // 这将用作数据库和 SQL 文件的主键
+        analysisId = featureDirName;
+
+        // 8. 构造最终的 Feature.dat 文件路径
+        featureDatFileAbsolutePath = absoluteParentDir.resolve(featureDirName).resolve("Feature.dat");
+
+        // --- 路径推断结束 ---
+
 
         logger.info("尝试读取和解析的特征文件绝对路径: {}", featureDatFileAbsolutePath.toString());
 
@@ -268,6 +376,8 @@ public class ImgController {
             throw new java.io.FileNotFoundException("特征文件 (Feature.dat) 未找到或不可读。检查路径: " + featureDatFileAbsolutePath);
         }
 
+        // 1. 解析 Feature.dat 文件
+        //
         Map<String, List<? extends Number>> features = this.featureParserService.parseFeatureFile(featureDatFileAbsolutePath.toString());
 
         if (features == null || features.isEmpty()) {
@@ -277,11 +387,26 @@ public class ImgController {
             );
         }
 
+        // --- [新增] 持久化逻辑 ---
+        try {
+            // 2. 调用新服务保存数据
+            logger.info("开始持久化 analysisId '{}' 的特征数据...", analysisId);
+            featurePersistenceService.persistFeatures(features, analysisId);
+            logger.info("成功持久化 analysisId '{}' 的特征数据。", analysisId);
+        } catch (Exception e) {
+            // 记录错误，但**不**中断对前端的响应
+            logger.error("持久化特征数据失败 (analysisId: {}): {}。将继续向前端返回数据。",
+                    analysisId, e.getMessage(), e);
+        }
+        // --- 持久化逻辑结束 ---
+
+        // 3. 正常返回数据给前端
         logger.info("成功提取特征数据，共 {} 个特征类型。", features.size());
         return ResponseEntity.ok(
                 new FeatureDataResponse(true, "特征数据提取成功。", features)
         );
     }
+
 
     //TODO: 读取生成数据有问题,路径需要两个result才能生成，和c++的代码有关系
     /**

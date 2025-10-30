@@ -107,77 +107,169 @@ public class MultiFrameProcessorCpp {
     }
 
     /**
+     * JNA 结构体，映射 C++ 中的 `InputPathSet` 结构体。
+     */
+    public static class InputPathSet extends Structure {
+        public String outputDir; // 对应 C++: char * outputDir
+        public String par_path;  // 对应 C++: char * par_path
+        public String trackPath; // 对应 C++: char * trackPath
+        public String inImgDir;  // 对应 C++: char * inImgDir
+
+        public InputPathSet() {
+            super(ALIGN_DEFAULT);
+        }
+
+        @Override
+        protected List<String> getFieldOrder() {
+            // 顺序必须与 C++ XJYTXFXCV.h 中的 InputPathSet 严格一致
+            return Arrays.asList("outputDir", "par_path", "trackPath", "inImgDir");
+        }
+
+        /**
+         * ByValue 内部类，用于在 InputData 中进行值传递（嵌套）。
+         */
+        public static class ByValue extends InputPathSet implements Structure.ByValue {
+            public ByValue() {}
+        }
+    }
+
+//    /**
+//     * JNA 结构体，映射 C++ 中用于接收输入数据的 `InputData` 结构体。
+//     */
+//    public static class InputData extends Structure {
+//        public String originalBase64; // 在多帧模式下，这是一个逗号分隔的文件绝对路径列表。
+//        public String croppedBase64;  // 在多帧模式下，通常与 originalBase64 相同。
+//        public String resultDir;      // 保存结果路径
+//        public String algorithmName;  // 使用的算法名称。
+//        public int fileNum;           // 要处理的文件总数。
+//        public int mode;              // 处理模式（例如，1 代表多帧）。
+//        public int imgType;           // 图像类型（未使用）。
+//        public int id;                // 请求ID（未使用）。
+//        public CropBox.ByValue crop;  // 裁剪框参数（按值传递）。
+//
+//        public InputData() {
+//            super(ALIGN_DEFAULT);
+//        }
+//
+//        // 定义字段顺序，必须与 C++ 侧一致
+//        protected List<String> getFieldOrder() {
+//            return Arrays.asList("originalBase64", "croppedBase64", "resultDir", "algorithmName", "fileNum", "mode", "imgType", "id", "crop");
+//        }
+//
+//        /**
+//         * 实现了 Structure.ByReference 的内部类。
+//         * JNA 会传递指向该结构体实例的指针给 C++ 函数。
+//         */
+//        public static class ByReference extends InputData implements Structure.ByReference {
+//        }
+//    }
+
+    /**
      * JNA 结构体，映射 C++ 中用于接收输入数据的 `InputData` 结构体。
      */
     public static class InputData extends Structure {
-        public String originalBase64; // 在多帧模式下，这是一个逗号分隔的文件绝对路径列表。
-        public String croppedBase64;  // 在多帧模式下，通常与 originalBase64 相同。
-        public String resultDir;      // 保存结果路径
-        public String algorithmName;  // 使用的算法名称。
-        public int fileNum;           // 要处理的文件总数。
-        public int mode;              // 处理模式（例如，1 代表多帧）。
-        public int imgType;           // 图像类型（未使用）。
-        public int id;                // 请求ID（未使用）。
-        public CropBox.ByValue crop;  // 裁剪框参数（按值传递）。
+        public InputPathSet.ByValue inputPathSet; // [新增] 对应 C++: InputPathSet inputPathSet;
+
+        public String algorithmName;  // 对应 C++: const char *algorithmName
+        public int fileNum;           // 对应 C++: int fileNum
+        public int mode;              // 对应 C++: int mode
+        public int imgType;           // 对应 C++: int imgType
+        public int id;                // 对应 C++: int id
+        public CropBox.ByValue crop;  // 对应 C++: CropBox crop
 
         public InputData() {
             super(ALIGN_DEFAULT);
         }
 
-        // 定义字段顺序，必须与 C++ 侧一致
+        // 定义字段顺序，必须与 C++ 侧 XJYTXFXCV.h 一致
+        @Override
         protected List<String> getFieldOrder() {
-            return Arrays.asList("originalBase64", "croppedBase64", "resultDir", "algorithmName", "fileNum", "mode", "imgType", "id", "crop");
+            return Arrays.asList("inputPathSet", "algorithmName", "fileNum", "mode", "imgType", "id", "crop");
         }
 
-        /**
-         * 实现了 Structure.ByReference 的内部类。
-         * JNA 会传递指向该结构体实例的指针给 C++ 函数。
-         */
-        public static class ByReference extends InputData implements Structure.ByReference {
+        public static class ByReference extends InputData implements Structure.ByReference {}
+    }
+
+    /**
+     * JNA 结构体，映射 C++ 中的 `OutputPathSet` 结构体。
+     */
+    public static class OutputPathSet extends Structure {
+        public String feature_path; // 对应 C++: char * feature_path
+        public String outImgDir;    // 对应 C++: char * outImgDir
+
+        public OutputPathSet() {
+            super(ALIGN_DEFAULT);
+        }
+
+        @Override
+        protected List<String> getFieldOrder() {
+            // 顺序必须与 C++ XJYTXFXCV.h 中的 OutputPathSet 严格一致
+            return Arrays.asList("feature_path", "outImgDir");
         }
     }
+
+//    /**
+//     * JNA 结构体，映射 C++ 中用于返回处理结果的 `OutputData` 结构体。
+//     */
+//    public static class OutputData extends Structure {
+//        public String processedBase64; // 在多帧模式下，此字段通常不被使用。
+//        public Pointer result;         // 指向由 C++ 分配的结果数据（可能是特征数组）的指针。
+//        public int result_length;      // 结果数据的长度。
+//        public String message;         // C++ 返回的状态或调试消息。
+//        public String outputDir;       // C++ 处理后生成所有结果文件的输出目录路径。
+//        public int fileNum;            // C++ 实际成功处理的文件数量。
+//
+//        public OutputData() {
+//            super(ALIGN_DEFAULT);
+//        }
+//
+//        // 定义字段顺序
+//        protected List<String> getFieldOrder() {
+//            return Arrays.asList("processedBase64", "result", "result_length", "message", "outputDir", "fileNum");
+//        }
+//
+//        /**
+//         * 从 JNA 指针中安全地提取 float 数组。
+//         * @return 一个包含结果数据的 float 数组，如果指针为空或长度为0，则返回空数组。
+//         */
+//        public float[] getResultArray() {
+//            if (this.result_length <= 0 || this.result == null) {
+//                return new float[0];
+//            }
+//            try {
+//                return this.result.getFloatArray(0, this.result_length);
+//            } catch (Exception e) {
+//                logger.error("尝试从 OutputData.result 读取浮点数组时出错 (长度: {}): {}", this.result_length, e.getMessage());
+//                return new float[0];
+//            }
+//        }
+//
+//        /**
+//         * 按引用传递的标记子类。
+//         */
+//        public static class ByReference extends OutputData implements Structure.ByReference {
+//        }
+//    }
 
     /**
      * JNA 结构体，映射 C++ 中用于返回处理结果的 `OutputData` 结构体。
      */
     public static class OutputData extends Structure {
-        public String processedBase64; // 在多帧模式下，此字段通常不被使用。
-        public Pointer result;         // 指向由 C++ 分配的结果数据（可能是特征数组）的指针。
-        public int result_length;      // 结果数据的长度。
-        public String message;         // C++ 返回的状态或调试消息。
-        public String outputDir;       // C++ 处理后生成所有结果文件的输出目录路径。
-        public int fileNum;            // C++ 实际成功处理的文件数量。
+        public OutputPathSet outputPathSet; // 对应 C++: OutputPathSet outputPathSet;
+        public String message;          // 对应 C++: char *message
+        public int fileNum;             // 对应 C++: int fileNum
 
         public OutputData() {
             super(ALIGN_DEFAULT);
         }
 
         // 定义字段顺序
+        @Override
         protected List<String> getFieldOrder() {
-            return Arrays.asList("processedBase64", "result", "result_length", "message", "outputDir", "fileNum");
+            return Arrays.asList("outputPathSet", "message", "fileNum");
         }
 
-        /**
-         * 从 JNA 指针中安全地提取 float 数组。
-         * @return 一个包含结果数据的 float 数组，如果指针为空或长度为0，则返回空数组。
-         */
-        public float[] getResultArray() {
-            if (this.result_length <= 0 || this.result == null) {
-                return new float[0];
-            }
-            try {
-                return this.result.getFloatArray(0, this.result_length);
-            } catch (Exception e) {
-                logger.error("尝试从 OutputData.result 读取浮点数组时出错 (长度: {}): {}", this.result_length, e.getMessage());
-                return new float[0];
-            }
-        }
-
-        /**
-         * 按引用传递的标记子类。
-         */
-        public static class ByReference extends OutputData implements Structure.ByReference {
-        }
+        public static class ByReference extends OutputData implements Structure.ByReference {}
     }
 
     /**
@@ -211,22 +303,27 @@ public class MultiFrameProcessorCpp {
     */
 
     /**
-     * 【新】处理通过API上传的多个文件，执行多帧图像识别。
-     * @param files 从Controller接收到的MultipartFile列表。
+     * 处理通过API上传的多个文件，执行多帧图像识别。
+     * @param imageFiles    从Controller接收到的图像MultipartFile列表。
+     * @param trackFile     GJ 模式 (mode=2) 所需的轨迹文件。
      * @param algorithmName 要使用的算法名称。
+     * @param mode          处理模式 (1=多帧, 2=GJ)。
      * @return 包含处理结果的详细信息。
      * @throws IOException 如果在创建临时文件或目录时发生 I/O 错误。
      */
-    public MultiFrameResultResponse processUploadedFiles(List<MultipartFile> files, String algorithmName) throws IOException {
+    public MultiFrameResultResponse processUploadedFiles(List<MultipartFile> imageFiles,
+                                                         MultipartFile trackFile,
+                                                         String algorithmName,
+                                                         int mode) throws IOException {
         // 1. 创建一个唯一的临时目录来安全地存放上传的文件
         Path tempDir = Files.createTempDirectory("multi-frame-upload-" + UUID.randomUUID().toString());
         logger.info("为本次请求创建了临时目录: {}", tempDir.toAbsolutePath());
 
         try {
-            List<String> tempFilePaths = new ArrayList<>();
-            List<String> originalFileNames = new ArrayList<>();
+            List<String> tempImageFilePaths = new ArrayList<>();
+            List<String> originalImageFileNames = new ArrayList<>();
 
-            for (MultipartFile file : files) {
+            for (MultipartFile file : imageFiles) {
                 if (file.isEmpty()) {
                     continue;
                 }
@@ -246,19 +343,48 @@ public class MultiFrameProcessorCpp {
                     Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
                 }
 
-                tempFilePaths.add(tempFile.toAbsolutePath().toString());
-                originalFileNames.add(originalFileName);
+                tempImageFilePaths.add(tempFile.toAbsolutePath().toString());
+                originalImageFileNames.add(originalFileName);
             }
 
-            if (tempFilePaths.isEmpty()) {
+            // 保存轨迹文件 (如果 mode == 2)
+            if (tempImageFilePaths.isEmpty()) {
                 throw new ProcessException("上传的文件均为空或无效，无法处理。");
             }
 
+            String tempTrackFilePath = null;
+            if (mode == 2) {
+                if (trackFile == null || trackFile.isEmpty()) {
+                    throw new ProcessException("模式 2 (GJDeal) 必须提供一个轨迹 (track) 文件。");
+                }
+                String originalTrackFileName = trackFile.getOriginalFilename();
+                if (originalTrackFileName == null || originalTrackFileName.contains("..")) {
+                    throw new ProcessException("包含无效字符的非法轨迹文件名: " + originalTrackFileName);
+                }
+
+                Path tempTrackFile = tempDir.resolve(originalTrackFileName).normalize();
+                try (InputStream inputStream = trackFile.getInputStream()) {
+                    Files.copy(inputStream, tempTrackFile, StandardCopyOption.REPLACE_EXISTING);
+                }
+                tempTrackFilePath = tempTrackFile.toAbsolutePath().toString();
+                logger.info("轨迹文件已保存到: {}", tempTrackFilePath);
+            }
+
+            String imageDirectoryPath = tempDir.toAbsolutePath().toString();
+            int numImageFiles = tempImageFilePaths.size();
+
             // 2. 调用重构后的核心处理逻辑
-            return processFiles(tempFilePaths, originalFileNames, algorithmName);
+            return processFiles(
+                    imageDirectoryPath,   // C++ 的 inImgDir
+                    tempTrackFilePath,    // C++ 的 trackPath
+                    originalImageFileNames,
+                    algorithmName,
+                    mode,
+                    numImageFiles
+            );
 
         } finally {
-            // 3. 【关键】无论成功与否，都必须清理临时文件和目录
+            // 5. 【关键】无论成功与否，都必须清理临时文件和目录
             logger.info("处理完成，开始清理临时目录: {}", tempDir.toAbsolutePath());
             try (Stream<Path> walk = Files.walk(tempDir)) {
                 walk.sorted(Comparator.reverseOrder())
@@ -273,16 +399,25 @@ public class MultiFrameProcessorCpp {
     }
 
     /**
-     * 【重构】核心处理逻辑，被 processDirectory 和 processUploadedFiles 共用。
-     * @param filePathsList 待处理文件的绝对路径列表。
+     * 核心处理逻辑，被 processDirectory 和 processUploadedFiles 共用。
+     * @param imageDirectoryPath    待处理图像文件所在的目录 (对应 C++ inImgDir)。
+     * @param trackFilePath         轨迹文件的绝对路径 (对应 C++ trackPath)。
      * @param originalFileNamesOnly 原始文件名列表，用于构建返回结果。
-     * @param algorithmName 算法名称。
+     * @param algorithmName         算法名称。
+     * @param mode                  处理模式 (1 或 2)。
+     * @param numFiles              图像文件数量。
      * @return 处理结果。
      */
-    private MultiFrameResultResponse processFiles(List<String> filePathsList, List<String> originalFileNamesOnly, String algorithmName) throws IOException {
-        String commaSeparatedFilePaths = String.join(",", filePathsList);
-        int numFiles = filePathsList.size();
-        logger.info("共有 {} 个图像文件准备调用C++处理。", numFiles);
+    private MultiFrameResultResponse processFiles(
+            String imageDirectoryPath,
+            String trackFilePath,
+            List<String> originalFileNamesOnly,
+            String algorithmName,
+            int mode,
+            int numFiles) throws IOException {
+//        String commaSeparatedFilePaths = String.join(",", filePathsList);
+//        int numFiles = filePathsList.size();
+//        logger.info("共有 {} 个图像文件准备调用C++处理。", numFiles);
 
         ConfigDto config = configService.getConfig();
         ConfigDto.Region region = config.getRegion();
@@ -291,36 +426,80 @@ public class MultiFrameProcessorCpp {
         );
 
         Path projectRoot = getProjectRootPath();
-        Path resultPath = projectRoot.resolve("result");
-        if (!Files.exists(resultPath)) {
-            Files.createDirectories(resultPath);
+
+        // 1. C++ DLL 的输出根目录 (例如: ".../result/")
+        // C++ DLL 将在此目录下创建带时间戳的 'img' 和 'feature' 文件夹
+//        Path resultPath = projectRoot.resolve("result");
+//        if (!Files.exists(resultPath)) {
+//            Files.createDirectories(resultPath);
+//        }
+        Path resultBasePath = projectRoot.resolve("result");
+        if (!Files.exists(resultBasePath)) {
+            Files.createDirectories(resultBasePath);
         }
-        String resultPathString = resultPath.toAbsolutePath().toString();
+        //String resultPathString = resultPath.toAbsolutePath().toString();
+        String resultBaseDirString = resultBasePath.toAbsolutePath().toString();
+
+        // 2. 神经网络参数路径
+        // C++ 使用 "../Parameter/tfImg.pb"
+        Path parPath = projectRoot.resolve("Parameter").resolve("tfImg.pb");
+        String parPathString = parPath.toAbsolutePath().toString();
+        if (!Files.exists(parPath)) {
+            logger.warn("神经网络参数文件未找到: {}。C++ 调用可能因此失败。", parPathString);
+        } else {
+            logger.info("找到神经网络参数文件: {}", parPathString);
+        }
 
         InputData.ByReference inputData = new InputData.ByReference();
         OutputData.ByReference outputData = new OutputData.ByReference();
         int processStatus = -1;
 
         try {
-            inputData.mode = 1;
+//            inputData.mode = 1;
+//            inputData.algorithmName = algorithmName;
+//            inputData.originalBase64 = commaSeparatedFilePaths;
+//            inputData.croppedBase64 = commaSeparatedFilePaths;
+//            inputData.fileNum = numFiles;
+//            inputData.crop = cropBoxConfig;
+//            inputData.resultDir = resultPathString;
+//            inputData.imgType = 1;
+            // 1. 填充 InputPathSet
+            inputData.inputPathSet = new InputPathSet.ByValue();
+            inputData.inputPathSet.inImgDir = imageDirectoryPath;
+            inputData.inputPathSet.outputDir = resultBaseDirString; // C++ 需要这个*根*目录
+            inputData.inputPathSet.par_path = parPathString;
+            inputData.inputPathSet.trackPath = trackFilePath; // 如果 mode=1，可以为 null
+
+            // 2. 填充 InputData 的其余字段
+            inputData.mode = mode;
             inputData.algorithmName = algorithmName;
-            inputData.originalBase64 = commaSeparatedFilePaths;
-            inputData.croppedBase64 = commaSeparatedFilePaths;
             inputData.fileNum = numFiles;
             inputData.crop = cropBoxConfig;
-            inputData.resultDir = resultPathString;
-            inputData.imgType = 1;
+            inputData.imgType = 1; // 默认值，与 C++ demo 一致
+            inputData.id = 0; // 默认值
 
             logger.info("调用C++ processImageWrapper (多帧模式)...");
             processStatus = NativeMultiFrameLib.INSTANCE.processImageWrapper(inputData, outputData);
             logger.info("C++ processImageWrapper (多帧模式) 返回状态: {}", processStatus);
 
             if (processStatus == 0) {
-                String resultOutputDir = outputData.outputDir;
-                if (resultOutputDir == null || resultOutputDir.trim().isEmpty()) {
-                    throw new ProcessException("核心算法处理成功但未指定输出目录。");
+//                String resultOutputDir = outputData.outputDir;
+//                if (resultOutputDir == null || resultOutputDir.trim().isEmpty()) {
+//                    throw new ProcessException("核心算法处理成功但未指定输出目录。");
+//                }
+//                logger.info("C++ (多帧) 处理成功。消息: '{}', 输出目录: '{}'", outputData.message, resultOutputDir);
+                if (outputData.outputPathSet == null) {
+                    throw new ProcessException("核心算法处理成功 (status=0) 但未返回 outputPathSet。");
                 }
-                logger.info("C++ (多帧) 处理成功。消息: '{}', 输出目录: '{}'", outputData.message, resultOutputDir);
+
+                String resultOutputDir = outputData.outputPathSet.outImgDir;
+                String featureFilePath = outputData.outputPathSet.feature_path;
+
+                if (resultOutputDir == null || resultOutputDir.trim().isEmpty() ||
+                        featureFilePath == null || featureFilePath.trim().isEmpty()) {
+                    throw new ProcessException("核心算法返回的路径无效。");
+                }
+                logger.info("C++ (多帧) 处理成功。消息: '{}', 图像输出目录: '{}', 特征文件: '{}'", outputData.message, resultOutputDir, featureFilePath);
 
                 // C++成功执行后，直接从结果目录读取并排序文件名
                 List<String> generatedPngFiles;
@@ -372,8 +551,20 @@ public class MultiFrameProcessorCpp {
 
                 // --- END: NEW FILENAME GENERATION LOGIC ---
 
+//                return new MultiFrameResultResponse(
+//                        true, resultOutputDir, resultFiles,
+//                        outputData.message != null ? outputData.message : "处理成功",
+//                        outputData.fileNum
+//                );
+//            } else {
+//                String errorMsg = "C++ (多帧) 处理失败。状态: " + processStatus + ", 消息: " + outputData.message;
+//                logger.error(errorMsg);
+//                throw new ProcessException(errorMsg);
+//            }
                 return new MultiFrameResultResponse(
-                        true, resultOutputDir, resultFiles,
+                        true,
+                        resultOutputDir, // [重要] 使用 C++ 返回的实际图像目录
+                        resultFiles,
                         outputData.message != null ? outputData.message : "处理成功",
                         outputData.fileNum
                 );
@@ -438,150 +629,150 @@ public class MultiFrameProcessorCpp {
 //        }
 //    }
 
-    /**
-     * 处理指定目录中的所有文件，执行多帧图像识别。
-     * @param inputDirPath 包含图像文件的输入目录的绝对路径。
-     * @param algorithmName 要使用的算法名称。
-     * @return 返回一个 {@link MultiFrameResultResponse} 对象，其中包含处理结果的详细信息。
-     * @throws IOException 如果读取目录或文件时发生 I/O 错误。
-     * @throws ProcessException 如果处理过程中发生逻辑错误（如目录为空）或 C++ 库返回错误。
-     */
-    public MultiFrameResultResponse processDirectory(String inputDirPath, String algorithmName) throws IOException {
-        logger.info("开始处理多帧图像: 目录 '{}', 算法: {}", inputDirPath, algorithmName);
-
-        // --- 1. 扫描并收集目录下的所有文件路径 ---
-        List<String> filePathsList;
-        try (Stream<Path> paths = Files.list(Paths.get(inputDirPath))) {
-            filePathsList = paths
-                    .filter(Files::isRegularFile) // 只保留文件，忽略子目录
-                    .map(Path::toAbsolutePath)    // 转换为绝对路径
-                    .map(Path::toString)          // 转换为字符串
-                    .collect(Collectors.toList());
-        } catch (IOException e) {
-            logger.error("无法读取输入目录中的文件列表: {}", inputDirPath, e);
-            throw new ProcessException("无法读取输入目录 '" + inputDirPath + "': " + e.getMessage(), e);
-        }
-
-        if (filePathsList.isEmpty()) {
-            logger.warn("输入目录 {} 为空或不包含文件。", inputDirPath);
-            throw new ProcessException("指定的输入目录不包含任何文件。");
-        }
-
-        // --- 2. 准备传递给 C++ 的数据 ---
-        // 将文件路径列表合并成一个由逗号分隔的字符串
-        String commaSeparatedFilePaths = String.join(",", filePathsList);
-        int numFiles = filePathsList.size();
-        logger.info("共有 {} 个图像文件。准备调用C++处理。", numFiles);
-        // 打印部分路径用于调试，避免日志过长
-        logger.debug("文件列表 (部分): {}", commaSeparatedFilePaths.substring(0, Math.min(200, commaSeparatedFilePaths.length())));
-
-        // 从 ConfigService 加载裁剪框配置
-        logger.info("正在从 ConfigService 加载配置...");
-        ConfigDto config = configService.getConfig();
-        ConfigDto.Region region = config.getRegion();
-        CropBox.ByValue cropBoxConfig = new CropBox.ByValue(
-                region.getX(), region.getY(), region.getWidth(), region.getHeight()
-        );
-        logger.info("从 ConfigService 成功加载裁剪框: x={}, y={}, width={}, height={}",
-                region.getX(), region.getY(), region.getWidth(), region.getHeight());
-
-        // --- 2.5 计算并准备输出路径 ---
-        Path projectRoot = getProjectRootPath();
-        Path resultPath = projectRoot.resolve("result");
-        // 确保目录存在 (C++层不做目录创建，由Java负责更安全)
-        if (!Files.exists(resultPath)) {
-            try {
-                Files.createDirectories(resultPath);
-                logger.info("结果目录不存在，已自动创建: {}", resultPath);
-            } catch (IOException e) {
-                throw new ProcessException("无法创建结果输出目录: " + resultPath, e);
-            }
-        }
-        String resultPathString = resultPath.toAbsolutePath().toString();
-        logger.info("将传递给C++的绝对输出路径: {}", resultPathString);
-
-        // --- 3. 调用 C++ 库 ---
-        InputData.ByReference inputData = new InputData.ByReference();
-        OutputData.ByReference outputData = new OutputData.ByReference();
-        int processStatus = -1;
-
-        try {
-            // 填充输入结构体
-            inputData.mode = 1; // 1 代表多帧模式
-            inputData.algorithmName = algorithmName;
-            inputData.originalBase64 = commaSeparatedFilePaths;
-            inputData.croppedBase64 = commaSeparatedFilePaths;
-            inputData.fileNum = numFiles;
-            inputData.id = 0; // 未使用
-            inputData.imgType = 1;
-            inputData.crop = cropBoxConfig;
-
-            inputData.resultDir = resultPathString;
-
-            logger.info("调用C++ processImageWrapper (多帧模式)...");
-            processStatus = NativeMultiFrameLib.INSTANCE.processImageWrapper(inputData, outputData);
-            logger.info("C++ processImageWrapper (多帧模式) 返回状态: {}", processStatus);
-
-            // --- 4. 处理 C++ 返回结果 ---
-            if (processStatus == 0) { // 成功
-                String resultOutputDir = outputData.outputDir;
-                if (resultOutputDir == null || resultOutputDir.trim().isEmpty()) {
-                    logger.error("C++ (多帧) 处理成功但未返回有效的输出目录路径。");
-                    throw new ProcessException("核心算法处理成功但未指定输出目录。");
-                }
-                logger.info("C++ (多帧) 处理成功。消息: '{}', 输出目录: '{}'", outputData.message, resultOutputDir);
-
-                // 根据原始文件名，推断出结果图像和ROI图像的文件名
-                List<String> originalFileNamesOnly = filePathsList.stream()
-                        .map(fullPath -> new File(fullPath).getName())
-                        .collect(Collectors.toList());
-                List<String> interestImageNames = new ArrayList<>();
-                List<String> outputImageNames = new ArrayList<>();
-
-                for (String originalNameWithExt : originalFileNamesOnly) {
-                    // 假设结果文件名与原始文件名（除扩展名外）有固定关系
-                    String baseName = originalNameWithExt.substring(0, originalNameWithExt.lastIndexOf('.'));
-                    interestImageNames.add("roi_" + baseName + ".png");
-                    outputImageNames.add(baseName + ".png");
-                }
-
-                MultiFrameResultResponse.ResultFiles resultFiles =
-                        new MultiFrameResultResponse.ResultFiles(originalFileNamesOnly, interestImageNames, outputImageNames);
-
-                // 构建并返回给 Controller 的最终响应对象
-                return new MultiFrameResultResponse(
-                        true,
-                        resultOutputDir,
-                        resultFiles,
-                        outputData.message != null ? outputData.message : "处理成功",
-                        outputData.fileNum // 使用 C++ 返回的实际处理文件数
-                );
-
-            } else { // 失败
-                String errorMsg = "C++ (多帧) 处理失败。状态: " + processStatus;
-                if (outputData.message != null && !outputData.message.isEmpty()) {
-                    errorMsg += ", 消息: " + outputData.message;
-                }
-                logger.error(errorMsg);
-                throw new ProcessException(errorMsg);
-            }
-        } catch (UnsatisfiedLinkError ule) {
-            logger.error("JNA链接错误: {}", ule.getMessage(), ule);
-            throw new ProcessException("无法链接到多帧核心处理库。确保 XJYTXFXCV_multi 及其依赖项正确。", ule);
-        }
-        finally {
-            // --- 5. 内存管理 ---
-            // 无论成功或失败，都必须调用 freeOutputData 释放 C++ 分配的内存
-            if (outputData.getPointer() != null) {
-                try {
-                    NativeMultiFrameLib.INSTANCE.freeOutputData(outputData);
-                    logger.info("已调用 freeOutputData (多帧) 清理 OutputData。");
-                } catch (Exception e) {
-                    logger.error("调用 freeOutputData (多帧) 时发生错误。", e);
-                }
-            }
-        }
-    }
+//    /**
+//     * 处理指定目录中的所有文件，执行多帧图像识别。
+//     * @param inputDirPath 包含图像文件的输入目录的绝对路径。
+//     * @param algorithmName 要使用的算法名称。
+//     * @return 返回一个 {@link MultiFrameResultResponse} 对象，其中包含处理结果的详细信息。
+//     * @throws IOException 如果读取目录或文件时发生 I/O 错误。
+//     * @throws ProcessException 如果处理过程中发生逻辑错误（如目录为空）或 C++ 库返回错误。
+//     */
+//    public MultiFrameResultResponse processDirectory(String inputDirPath, String algorithmName) throws IOException {
+//        logger.info("开始处理多帧图像: 目录 '{}', 算法: {}", inputDirPath, algorithmName);
+//
+//        // --- 1. 扫描并收集目录下的所有文件路径 ---
+//        List<String> filePathsList;
+//        try (Stream<Path> paths = Files.list(Paths.get(inputDirPath))) {
+//            filePathsList = paths
+//                    .filter(Files::isRegularFile) // 只保留文件，忽略子目录
+//                    .map(Path::toAbsolutePath)    // 转换为绝对路径
+//                    .map(Path::toString)          // 转换为字符串
+//                    .collect(Collectors.toList());
+//        } catch (IOException e) {
+//            logger.error("无法读取输入目录中的文件列表: {}", inputDirPath, e);
+//            throw new ProcessException("无法读取输入目录 '" + inputDirPath + "': " + e.getMessage(), e);
+//        }
+//
+//        if (filePathsList.isEmpty()) {
+//            logger.warn("输入目录 {} 为空或不包含文件。", inputDirPath);
+//            throw new ProcessException("指定的输入目录不包含任何文件。");
+//        }
+//
+//        // --- 2. 准备传递给 C++ 的数据 ---
+//        // 将文件路径列表合并成一个由逗号分隔的字符串
+//        String commaSeparatedFilePaths = String.join(",", filePathsList);
+//        int numFiles = filePathsList.size();
+//        logger.info("共有 {} 个图像文件。准备调用C++处理。", numFiles);
+//        // 打印部分路径用于调试，避免日志过长
+//        logger.debug("文件列表 (部分): {}", commaSeparatedFilePaths.substring(0, Math.min(200, commaSeparatedFilePaths.length())));
+//
+//        // 从 ConfigService 加载裁剪框配置
+//        logger.info("正在从 ConfigService 加载配置...");
+//        ConfigDto config = configService.getConfig();
+//        ConfigDto.Region region = config.getRegion();
+//        CropBox.ByValue cropBoxConfig = new CropBox.ByValue(
+//                region.getX(), region.getY(), region.getWidth(), region.getHeight()
+//        );
+//        logger.info("从 ConfigService 成功加载裁剪框: x={}, y={}, width={}, height={}",
+//                region.getX(), region.getY(), region.getWidth(), region.getHeight());
+//
+//        // --- 2.5 计算并准备输出路径 ---
+//        Path projectRoot = getProjectRootPath();
+//        Path resultPath = projectRoot.resolve("result");
+//        // 确保目录存在 (C++层不做目录创建，由Java负责更安全)
+//        if (!Files.exists(resultPath)) {
+//            try {
+//                Files.createDirectories(resultPath);
+//                logger.info("结果目录不存在，已自动创建: {}", resultPath);
+//            } catch (IOException e) {
+//                throw new ProcessException("无法创建结果输出目录: " + resultPath, e);
+//            }
+//        }
+//        String resultPathString = resultPath.toAbsolutePath().toString();
+//        logger.info("将传递给C++的绝对输出路径: {}", resultPathString);
+//
+//        // --- 3. 调用 C++ 库 ---
+//        InputData.ByReference inputData = new InputData.ByReference();
+//        OutputData.ByReference outputData = new OutputData.ByReference();
+//        int processStatus = -1;
+//
+//        try {
+//            // 填充输入结构体
+//            inputData.mode = 1; // 1 代表多帧模式
+//            inputData.algorithmName = algorithmName;
+//            inputData.originalBase64 = commaSeparatedFilePaths;
+//            inputData.croppedBase64 = commaSeparatedFilePaths;
+//            inputData.fileNum = numFiles;
+//            inputData.id = 0; // 未使用
+//            inputData.imgType = 1;
+//            inputData.crop = cropBoxConfig;
+//
+//            inputData.resultDir = resultPathString;
+//
+//            logger.info("调用C++ processImageWrapper (多帧模式)...");
+//            processStatus = NativeMultiFrameLib.INSTANCE.processImageWrapper(inputData, outputData);
+//            logger.info("C++ processImageWrapper (多帧模式) 返回状态: {}", processStatus);
+//
+//            // --- 4. 处理 C++ 返回结果 ---
+//            if (processStatus == 0) { // 成功
+//                String resultOutputDir = outputData.outputDir;
+//                if (resultOutputDir == null || resultOutputDir.trim().isEmpty()) {
+//                    logger.error("C++ (多帧) 处理成功但未返回有效的输出目录路径。");
+//                    throw new ProcessException("核心算法处理成功但未指定输出目录。");
+//                }
+//                logger.info("C++ (多帧) 处理成功。消息: '{}', 输出目录: '{}'", outputData.message, resultOutputDir);
+//
+//                // 根据原始文件名，推断出结果图像和ROI图像的文件名
+//                List<String> originalFileNamesOnly = filePathsList.stream()
+//                        .map(fullPath -> new File(fullPath).getName())
+//                        .collect(Collectors.toList());
+//                List<String> interestImageNames = new ArrayList<>();
+//                List<String> outputImageNames = new ArrayList<>();
+//
+//                for (String originalNameWithExt : originalFileNamesOnly) {
+//                    // 假设结果文件名与原始文件名（除扩展名外）有固定关系
+//                    String baseName = originalNameWithExt.substring(0, originalNameWithExt.lastIndexOf('.'));
+//                    interestImageNames.add("roi_" + baseName + ".png");
+//                    outputImageNames.add(baseName + ".png");
+//                }
+//
+//                MultiFrameResultResponse.ResultFiles resultFiles =
+//                        new MultiFrameResultResponse.ResultFiles(originalFileNamesOnly, interestImageNames, outputImageNames);
+//
+//                // 构建并返回给 Controller 的最终响应对象
+//                return new MultiFrameResultResponse(
+//                        true,
+//                        resultOutputDir,
+//                        resultFiles,
+//                        outputData.message != null ? outputData.message : "处理成功",
+//                        outputData.fileNum // 使用 C++ 返回的实际处理文件数
+//                );
+//
+//            } else { // 失败
+//                String errorMsg = "C++ (多帧) 处理失败。状态: " + processStatus;
+//                if (outputData.message != null && !outputData.message.isEmpty()) {
+//                    errorMsg += ", 消息: " + outputData.message;
+//                }
+//                logger.error(errorMsg);
+//                throw new ProcessException(errorMsg);
+//            }
+//        } catch (UnsatisfiedLinkError ule) {
+//            logger.error("JNA链接错误: {}", ule.getMessage(), ule);
+//            throw new ProcessException("无法链接到多帧核心处理库。确保 XJYTXFXCV_multi 及其依赖项正确。", ule);
+//        }
+//        finally {
+//            // --- 5. 内存管理 ---
+//            // 无论成功或失败，都必须调用 freeOutputData 释放 C++ 分配的内存
+//            if (outputData.getPointer() != null) {
+//                try {
+//                    NativeMultiFrameLib.INSTANCE.freeOutputData(outputData);
+//                    logger.info("已调用 freeOutputData (多帧) 清理 OutputData。");
+//                } catch (Exception e) {
+//                    logger.error("调用 freeOutputData (多帧) 时发生错误。", e);
+//                }
+//            }
+//        }
+//    }
 
     /**
      * 获取项目根目录，用于确定统一的输出路径。
