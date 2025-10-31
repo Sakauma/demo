@@ -430,19 +430,23 @@ private void generateAndAppendStatisticsSql(List<FrameFeature> frames, Path resu
             Short sec = getNumber(data, "sec", i, Short.class);
             Float msec = getNumber(data, "msec", i, Float.class);
 
-            if (year != null && month != null && day != null && hour != null && min != null && sec != null && msec != null) {
+            if (year != null && month != null && day != null && hour != null && min != null && sec != null && msec != null &&
+                    month > 0 && day > 0) {
                 try {
-                    // 将时间分量合并为 UTC Instant
+                    // 只有在值有效时才尝试创建时间戳
                     ZonedDateTime zdt = ZonedDateTime.of(
                             year, month, day, hour, min, sec, (int)(msec * 1000000),
                             ZoneId.of("UTC") // 数据是UTC时间
                     );
-                    // 假设 FrameFeature 实体中有一个 'private Instant faTime;' 字段
                     frame.setFaTime(zdt.toInstant());
                 } catch (Exception e) {
-                    logger.warn("在第 {} 帧解析时间戳失败: {}", i, e.getMessage());
+                    // 捕获无效日期 (例如 2月30日)
+                    logger.warn("在第 {} 帧解析时间戳失败 (值可能无效): {}", i, e.getMessage());
                     frame.setFaTime(null);
                 }
+            } else {
+                // 如果值是 null 或者是 C++ 的 0，则将时间戳设为 null
+                frame.setFaTime(null);
             }
 
             // --- 自动从 Map 填充所有字段 ---
