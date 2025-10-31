@@ -3,6 +3,7 @@ package com.demo.entity;
 import lombok.Data;
 import javax.persistence.*;
 import java.time.Instant;
+import java.nio.file.Path;
 
 /**
  * 特征数据实体类
@@ -10,9 +11,7 @@ import java.time.Instant;
  */
 @Data
 @Entity
-@Table(name = "frame_feature", indexes = {
-        @Index(name = "idx_analysis_id", columnList = "analysisId")
-})
+@Table(name = "FALSEALARMITEMDATA")
 public class FrameFeature {
 
     @Id
@@ -42,6 +41,22 @@ public class FrameFeature {
      */
     @Lob // 对于可能很长的字符串使用 @Lob
     private String confidences;
+
+    @Column(name = "FATIME")
+    private Instant faTime;
+    //@Lob // [!! 新增 !!] @Lob 告诉 JPA 这是一个大对象 (用于存储字节)
+    //private byte[] rawData; // [!! 新增 !!] (用于步骤 5)
+
+    @Transient // [!! 5. 确保使用 @Transient !!]
+    private Path rawDataPath;
+
+    public Path getRawDataPath() {
+        return rawDataPath;
+    }
+
+    public void setRawDataPath(Path rawDataPath) {
+        this.rawDataPath = rawDataPath;
+    }
 
     // --- Numerical Feature ---
     private Float variance;

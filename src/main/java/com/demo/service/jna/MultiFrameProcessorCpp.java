@@ -3,7 +3,6 @@ package com.demo.service.jna;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Structure;
-import com.sun.jna.Pointer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +31,9 @@ import com.demo.dto.MultiFrameResultResponse;
 import com.demo.exception.ProcessException;
 import com.demo.service.ConfigService;
 import com.demo.dto.ConfigDto;
+import com.demo.service.FeatureParserService;
+import com.demo.service.FeaturePersistenceService;
+import java.util.Map;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -58,14 +60,20 @@ public class MultiFrameProcessorCpp {
 
     private static final Logger logger = LoggerFactory.getLogger(MultiFrameProcessorCpp.class);
     private final ConfigService configService;
+    private final FeatureParserService featureParserService;
+    private final FeaturePersistenceService featurePersistenceService;
 
     /**
      * 构造函数，通过 Spring 的依赖注入初始化 ConfigService。
      * @param configService 配置服务，用于获取应用配置，如裁剪参数。
      */
     @Autowired
-    public MultiFrameProcessorCpp(ConfigService configService) {
+    public MultiFrameProcessorCpp(ConfigService configService,
+                                  FeatureParserService featureParserService,
+                                  FeaturePersistenceService featurePersistenceService) {
         this.configService = configService;
+        this.featureParserService = featureParserService;
+        this.featurePersistenceService = featurePersistenceService;
         logger.info("ConfigService 已注入到 MultiFrameProcessorCpp。");
     }
 
@@ -302,8 +310,113 @@ public class MultiFrameProcessorCpp {
     private CropBox.ByValue loadCropBoxFromIni() throws IOException { ... }
     */
 
+//    /**
+//     * 处理通过API上传的多个文件，执行多帧图像识别。
+//     * @param imageFiles    从Controller接收到的图像MultipartFile列表。
+//     * @param trackFile     GJ 模式 (mode=2) 所需的轨迹文件。
+//     * @param algorithmName 要使用的算法名称。
+//     * @param mode          处理模式 (1=多帧, 2=GJ)。
+//     * @return 包含处理结果的详细信息。
+//     * @throws IOException 如果在创建临时文件或目录时发生 I/O 错误。
+//     */
+//    public MultiFrameResultResponse processUploadedFiles(List<MultipartFile> imageFiles,
+//                                                         MultipartFile trackFile,
+//                                                         String algorithmName,
+//                                                         int mode) throws IOException {
+//        // 1. 创建一个唯一的临时目录来安全地存放上传的文件
+//        Path tempDir = Files.createTempDirectory("multi-frame-upload-" + UUID.randomUUID().toString());
+//        logger.info("为本次请求创建了临时目录: {}", tempDir.toAbsolutePath());
+//
+//        // 我们需要一个有序的 Path 列表，以便传递给持久化服务
+//        List<Path> orderedRawFilePaths = new ArrayList<>();
+//        List<String> originalImageFileNames = new ArrayList<>();
+//
+//        try {
+//            //List<String> tempImageFilePaths = new ArrayList<>();
+//            //List<String> originalImageFileNames = new ArrayList<>();
+//
+//            for (MultipartFile file : imageFiles) {
+//                if (file.isEmpty()) {
+//                    continue;
+//                }
+//                // 保证文件名安全，防止路径遍历攻击
+//                String originalFileName = file.getOriginalFilename();
+//                Path tempFile = tempDir.resolve(originalFileName).normalize();
+//                if (originalFileName == null || originalFileName.contains("..")) {
+//                    throw new ProcessException("包含无效字符的非法文件名: " + originalFileName);
+//                }
+//
+//                // 在临时目录下创建文件并从上传流中复制内容
+//                Path tempFile = tempDir.resolve(originalFileName).normalize();
+//                Path parentDir = tempFile.getParent();
+//                if (parentDir != null && !Files.exists(parentDir)) {
+//                    Files.createDirectories(parentDir);
+//                }
+//                try (InputStream inputStream = file.getInputStream()) {
+//                    Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+//                }
+//
+//                tempImageFilePaths.add(tempFile.toAbsolutePath().toString());
+//                originalImageFileNames.add(originalFileName);
+//            }
+//
+//            // 保存轨迹文件 (如果 mode == 2)
+//            if (tempImageFilePaths.isEmpty()) {
+//                throw new ProcessException("上传的文件均为空或无效，无法处理。");
+//            }
+//
+//            String tempTrackFilePath = null;
+//            if (mode == 2) {
+//                if (trackFile == null || trackFile.isEmpty()) {
+//                    throw new ProcessException("模式 2 (GJDeal) 必须提供一个轨迹 (track) 文件。");
+//                }
+//                String originalTrackFileName = trackFile.getOriginalFilename();
+//                if (originalTrackFileName == null || originalTrackFileName.contains("..")) {
+//                    throw new ProcessException("包含无效字符的非法轨迹文件名: " + originalTrackFileName);
+//                }
+//
+//                Path tempTrackFile = tempDir.resolve(originalTrackFileName).normalize();
+//                try (InputStream inputStream = trackFile.getInputStream()) {
+//                    Files.copy(inputStream, tempTrackFile, StandardCopyOption.REPLACE_EXISTING);
+//                }
+//                tempTrackFilePath = tempTrackFile.toAbsolutePath().toString();
+//                logger.info("轨迹文件已保存到: {}", tempTrackFilePath);
+//            }
+//
+//            String imageDirectoryPath = tempDir.toAbsolutePath().toString();
+//            int numImageFiles = tempImageFilePaths.size();
+//
+//            // 2. 调用重构后的核心处理逻辑
+//            return processFiles(
+//                    imageDirectoryPath,   // C++ 的 inImgDir
+//                    tempTrackFilePath,    // C++ 的 trackPath
+//                    originalImageFileNames,
+//                    algorithmName,
+//                    mode,
+//                    numImageFiles
+//            );
+//
+//        } finally {
+//            // 5. 【关键】无论成功与否，都必须清理临时文件和目录
+//            logger.info("处理完成，开始清理临时目录: {}", tempDir.toAbsolutePath());
+//            try (Stream<Path> walk = Files.walk(tempDir)) {
+//                walk.sorted(Comparator.reverseOrder())
+//                        .map(Path::toFile)
+//                        .forEach(File::delete);
+//                logger.info("临时目录已成功清理。");
+//            } catch (IOException e) {
+//                // 记录清理错误，但不向上抛出，以免覆盖原始的业务异常
+//                logger.error("清理临时目录 {} 时发生严重错误。", tempDir.toAbsolutePath(), e);
+//            }
+//        }
+//    }
+
     /**
      * 处理通过API上传的多个文件，执行多帧图像识别。
+     * [!! 已重构 !!]
+     * 此方法现在还负责在C++调用成功后、临时文件删除前，
+     * 立即调用持久化服务，以便传递原始DAT文件数据。
+     *
      * @param imageFiles    从Controller接收到的图像MultipartFile列表。
      * @param trackFile     GJ 模式 (mode=2) 所需的轨迹文件。
      * @param algorithmName 要使用的算法名称。
@@ -315,14 +428,18 @@ public class MultiFrameProcessorCpp {
                                                          MultipartFile trackFile,
                                                          String algorithmName,
                                                          int mode) throws IOException {
+
         // 1. 创建一个唯一的临时目录来安全地存放上传的文件
+        // [!! 已更正 !!] 我们只创建根临时目录，不创建 'IMG0'
         Path tempDir = Files.createTempDirectory("multi-frame-upload-" + UUID.randomUUID().toString());
         logger.info("为本次请求创建了临时目录: {}", tempDir.toAbsolutePath());
 
-        try {
-            List<String> tempImageFilePaths = new ArrayList<>();
-            List<String> originalImageFileNames = new ArrayList<>();
+        // [!! 新增 !!] 我们需要一个有序的 Path 列表，以便传递给持久化服务
+        List<Path> orderedRawFilePaths = new ArrayList<>();
+        List<String> originalImageFileNames = new ArrayList<>();
 
+        try {
+            // 2. 将所有上传的图像文件保存到临时目录
             for (MultipartFile file : imageFiles) {
                 if (file.isEmpty()) {
                     continue;
@@ -333,7 +450,7 @@ public class MultiFrameProcessorCpp {
                     throw new ProcessException("包含无效字符的非法文件名: " + originalFileName);
                 }
 
-                // 在临时目录下创建文件并从上传流中复制内容
+                // [!! 已更正 !!] 将文件保存在 根临时目录 (tempDir) 中
                 Path tempFile = tempDir.resolve(originalFileName).normalize();
                 Path parentDir = tempFile.getParent();
                 if (parentDir != null && !Files.exists(parentDir)) {
@@ -343,12 +460,12 @@ public class MultiFrameProcessorCpp {
                     Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
                 }
 
-                tempImageFilePaths.add(tempFile.toAbsolutePath().toString());
+                orderedRawFilePaths.add(tempFile); // [!! 新增 !!] 保存 Path 对象
                 originalImageFileNames.add(originalFileName);
             }
 
-            // 保存轨迹文件 (如果 mode == 2)
-            if (tempImageFilePaths.isEmpty()) {
+            // 3. 保存轨迹文件 (如果 mode == 2)
+            if (orderedRawFilePaths.isEmpty()) {
                 throw new ProcessException("上传的文件均为空或无效，无法处理。");
             }
 
@@ -362,6 +479,7 @@ public class MultiFrameProcessorCpp {
                     throw new ProcessException("包含无效字符的非法轨迹文件名: " + originalTrackFileName);
                 }
 
+                // [!! 已更正 !!] 轨迹文件也保存在 根临时目录 (tempDir)
                 Path tempTrackFile = tempDir.resolve(originalTrackFileName).normalize();
                 try (InputStream inputStream = trackFile.getInputStream()) {
                     Files.copy(inputStream, tempTrackFile, StandardCopyOption.REPLACE_EXISTING);
@@ -370,21 +488,68 @@ public class MultiFrameProcessorCpp {
                 logger.info("轨迹文件已保存到: {}", tempTrackFilePath);
             }
 
-            String imageDirectoryPath = tempDir.toAbsolutePath().toString();
-            int numImageFiles = tempImageFilePaths.size();
+            // [!! 已更正 !!] 我们将 *根临时目录* 的路径传递给 processFiles
+            String imageDirectoryPathForCpp = tempDir.toAbsolutePath().toString();
+            int numImageFiles = orderedRawFilePaths.size();
 
-            // 2. 调用重构后的核心处理逻辑
-            return processFiles(
-                    imageDirectoryPath,   // C++ 的 inImgDir
-                    tempTrackFilePath,    // C++ 的 trackPath
-                    originalImageFileNames,
+            // 4. 调用核心处理逻辑 (该方法已被重构为返回 OutputData)
+            // (processFiles 方法内部会负责附加 "/IMG0" 后缀)
+            OutputData.ByReference outputData = processFiles(
+                    imageDirectoryPathForCpp,   // 这是 .../temp-dir 路径
+                    tempTrackFilePath,
                     algorithmName,
                     mode,
                     numImageFiles
             );
 
+            // 5. [!! 核心重构 !!] 立即执行持久化
+            // (此时，C++ 已执行完毕，但 'tempDir' 中的原始 .dat 文件尚未被删除)
+            String featureDatPath = outputData.outputPathSet.feature_path;
+            String resultImgDir = outputData.outputPathSet.outImgDir;
+
+            if (featureDatPath == null || featureDatPath.trim().isEmpty()) {
+                logger.warn("C++ 未返回 feature_path，跳过持久化。");
+            } else {
+                try {
+                    // 5A. 解析 C++ 生成的 Feature.dat
+                    Map<String, List<? extends Number>> features = this.featureParserService.parseFeatureFile(featureDatPath);
+
+                    // 5B. 推断 AnalysisID
+                    String analysisId = Paths.get(featureDatPath).getParent().getFileName().toString();
+
+                    // 5C. [!! 关键 !!] 调用持久化，并传入原始文件路径列表
+                    logger.info("开始持久化 (在多帧处理流程中)... AnalysisID: {}", analysisId);
+                    this.featurePersistenceService.persistFeatures(features, analysisId, orderedRawFilePaths);
+                    logger.info("持久化完成 (在多帧处理流程中)。");
+
+                } catch (Exception e) {
+                    // 记录错误，但不要让它中断对前端的响应
+                    logger.error("在 infer_multi_frame 流程中持久化失败: {}", e.getMessage(), e);
+                }
+            }
+
+            // 6. 构建返回给 Controller 的 Response
+            MultiFrameResultResponse response = buildResponse(
+                    resultImgDir,
+                    outputData.message,
+                    outputData.fileNum,
+                    originalImageFileNames // 使用我们之前保存的原始文件名
+            );
+
+            // 7. 释放 C++ 内存
+            if (outputData != null && outputData.getPointer() != null) {
+                try {
+                    NativeMultiFrameLib.INSTANCE.freeOutputData(outputData);
+                    logger.info("已调用 freeOutputData (多帧) 清理 OutputData。");
+                } catch (Exception e) {
+                    logger.error("调用 freeOutputData (多帧) 时发生错误。", e);
+                }
+            }
+
+            return response;
+
         } finally {
-            // 5. 【关键】无论成功与否，都必须清理临时文件和目录
+            // 8. 【关键】无论成功与否，都必须清理临时文件和目录
             logger.info("处理完成，开始清理临时目录: {}", tempDir.toAbsolutePath());
             try (Stream<Path> walk = Files.walk(tempDir)) {
                 walk.sorted(Comparator.reverseOrder())
@@ -392,7 +557,7 @@ public class MultiFrameProcessorCpp {
                         .forEach(File::delete);
                 logger.info("临时目录已成功清理。");
             } catch (IOException e) {
-                // 记录清理错误，但不向上抛出，以免覆盖原始的业务异常
+                // 记录清理错误，但不向上抛出
                 logger.error("清理临时目录 {} 时发生严重错误。", tempDir.toAbsolutePath(), e);
             }
         }
@@ -400,24 +565,20 @@ public class MultiFrameProcessorCpp {
 
     /**
      * 核心处理逻辑，被 processDirectory 和 processUploadedFiles 共用。
-     * @param imageDirectoryPath    待处理图像文件所在的目录 (对应 C++ inImgDir)。
-     * @param trackFilePath         轨迹文件的绝对路径 (对应 C++ trackPath)。
-     * @param originalFileNamesOnly 原始文件名列表，用于构建返回结果。
-     * @param algorithmName         算法名称。
-     * @param mode                  处理模式 (1 或 2)。
-     * @param numFiles              图像文件数量。
+     *
+     * @param imageDirectoryPath 待处理图像文件所在的目录 (对应 C++ inImgDir)。
+     * @param trackFilePath      轨迹文件的绝对路径 (对应 C++ trackPath)。
+     * @param algorithmName      算法名称。
+     * @param mode               处理模式 (1 或 2)。
+     * @param numFiles           图像文件数量。
      * @return 处理结果。
      */
-    private MultiFrameResultResponse processFiles(
+    private OutputData.ByReference processFiles(
             String imageDirectoryPath,
             String trackFilePath,
-            List<String> originalFileNamesOnly,
             String algorithmName,
             int mode,
             int numFiles) throws IOException {
-//        String commaSeparatedFilePaths = String.join(",", filePathsList);
-//        int numFiles = filePathsList.size();
-//        logger.info("共有 {} 个图像文件准备调用C++处理。", numFiles);
 
         ConfigDto config = configService.getConfig();
         ConfigDto.Region region = config.getRegion();
@@ -429,15 +590,10 @@ public class MultiFrameProcessorCpp {
 
         // 1. C++ DLL 的输出根目录 (例如: ".../result/")
         // C++ DLL 将在此目录下创建带时间戳的 'img' 和 'feature' 文件夹
-//        Path resultPath = projectRoot.resolve("result");
-//        if (!Files.exists(resultPath)) {
-//            Files.createDirectories(resultPath);
-//        }
         Path resultBasePath = projectRoot.resolve("result");
         if (!Files.exists(resultBasePath)) {
             Files.createDirectories(resultBasePath);
         }
-        //String resultPathString = resultPath.toAbsolutePath().toString();
         String resultBaseDirString = resultBasePath.toAbsolutePath().toString();
 
         // 2. 神经网络参数路径
@@ -454,21 +610,17 @@ public class MultiFrameProcessorCpp {
         OutputData.ByReference outputData = new OutputData.ByReference();
         int processStatus = -1;
 
-        try {
-//            inputData.mode = 1;
-//            inputData.algorithmName = algorithmName;
-//            inputData.originalBase64 = commaSeparatedFilePaths;
-//            inputData.croppedBase64 = commaSeparatedFilePaths;
-//            inputData.fileNum = numFiles;
-//            inputData.crop = cropBoxConfig;
-//            inputData.resultDir = resultPathString;
-//            inputData.imgType = 1;
+        //try {
             // 1. 填充 InputPathSet
             inputData.inputPathSet = new InputPathSet.ByValue();
-            inputData.inputPathSet.inImgDir = imageDirectoryPath;
-            inputData.inputPathSet.outputDir = resultBaseDirString; // C++ 需要这个*根*目录
+            Path basePath = Paths.get(imageDirectoryPath);
+            Path finalImg0Path = basePath.resolve("IMG0");
+            inputData.inputPathSet.inImgDir = finalImg0Path.toAbsolutePath().toString();
+            inputData.inputPathSet.outputDir = resultBaseDirString; // C++ 需要这个根目录
             inputData.inputPathSet.par_path = parPathString;
             inputData.inputPathSet.trackPath = trackFilePath; // 如果 mode=1，可以为 null
+
+            logger.info("C++ (多帧) 接收的最终 'inImgDir' 路径: {}", inputData.inputPathSet.inImgDir);
 
             // 2. 填充 InputData 的其余字段
             inputData.mode = mode;
@@ -483,15 +635,9 @@ public class MultiFrameProcessorCpp {
             logger.info("C++ processImageWrapper (多帧模式) 返回状态: {}", processStatus);
 
             if (processStatus == 0) {
-//                String resultOutputDir = outputData.outputDir;
-//                if (resultOutputDir == null || resultOutputDir.trim().isEmpty()) {
-//                    throw new ProcessException("核心算法处理成功但未指定输出目录。");
-//                }
-//                logger.info("C++ (多帧) 处理成功。消息: '{}', 输出目录: '{}'", outputData.message, resultOutputDir);
                 if (outputData.outputPathSet == null) {
                     throw new ProcessException("核心算法处理成功 (status=0) 但未返回 outputPathSet。");
                 }
-
                 String resultOutputDir = outputData.outputPathSet.outImgDir;
                 String featureFilePath = outputData.outputPathSet.feature_path;
 
@@ -499,124 +645,89 @@ public class MultiFrameProcessorCpp {
                         featureFilePath == null || featureFilePath.trim().isEmpty()) {
                     throw new ProcessException("核心算法返回的路径无效。");
                 }
-                logger.info("C++ (多帧) 处理成功。消息: '{}', 图像输出目录: '{}', 特征文件: '{}'", outputData.message, resultOutputDir, featureFilePath);
+                logger.info("C++ (多帧) 处理成功。消息: '{}', 图像输出目录: '{}', 特征文件: '{}'",
+                        outputData.message, resultOutputDir, featureFilePath);
 
-                // C++成功执行后，直接从结果目录读取并排序文件名
-                List<String> generatedPngFiles;
-                try (Stream<Path> paths = Files.list(Paths.get(resultOutputDir))) {
-                    generatedPngFiles = paths
-                            .map(Path::getFileName)
-                            .map(Path::toString)
-                            .filter(name -> name.toLowerCase().endsWith(".png"))
-                            .collect(Collectors.toList());
-                }
-                // 使用自然排序对文件名进行排序
-                generatedPngFiles.sort(new NaturalOrderComparator());
-                logger.info("从结果目录 '{}' 读取并排序了 {} 个.png文件。", resultOutputDir, generatedPngFiles.size());
+                return outputData;
 
-                List<String> interestImageNames = new ArrayList<>();
-                // 假设 "roi_" 图像与结果图像一一对应
-                for (String pngFile : generatedPngFiles) {
-                    if (pngFile.toLowerCase().startsWith("roi_")) {
-                        // 如果已经是roi文件，则跳过，因为我们只关心主输出文件
-                        continue;
-                    }
-                    // 检查是否存在对应的 roi 文件
-                    Path roiPath = Paths.get(resultOutputDir, "roi_" + pngFile);
-                    if (Files.exists(roiPath)) {
-                        interestImageNames.add("roi_" + pngFile);
-                    }
-                }
-                // 过滤掉 roi_ 开头的文件，只保留主结果文件
-                List<String> outputImageNames = generatedPngFiles.stream()
-                        .filter(name -> !name.toLowerCase().startsWith("roi_"))
-                        .collect(Collectors.toList());
-
-                // 为每个结果帧找到它对应的原始 .dat 文件名
-                List<String> expandedOriginalNames = new ArrayList<>();
-                for (String pngName : outputImageNames) {
-                    // 移除帧号和扩展名来匹配原始文件名
-                    String pngBaseName = pngName.substring(0, pngName.lastIndexOf('_'));
-                    String originalFound = originalFileNamesOnly.stream()
-                            .map(ofn -> ofn.substring(0, ofn.lastIndexOf('.'))) // 获取原始文件的基础名
-                            .filter(ofnBase -> ofnBase.equals(pngBaseName))
-                            .findFirst()
-                            .orElse(originalFileNamesOnly.get(0)); // 如果找不到，默认用第一个
-                    expandedOriginalNames.add(originalFound + ".dat"); // 假设原始文件总是 .dat
-                }
-
-
-                MultiFrameResultResponse.ResultFiles resultFiles =
-                        new MultiFrameResultResponse.ResultFiles(expandedOriginalNames, interestImageNames, outputImageNames);
-
-                // --- END: NEW FILENAME GENERATION LOGIC ---
-
-//                return new MultiFrameResultResponse(
-//                        true, resultOutputDir, resultFiles,
-//                        outputData.message != null ? outputData.message : "处理成功",
-//                        outputData.fileNum
-//                );
-//            } else {
-//                String errorMsg = "C++ (多帧) 处理失败。状态: " + processStatus + ", 消息: " + outputData.message;
-//                logger.error(errorMsg);
-//                throw new ProcessException(errorMsg);
-//            }
-                return new MultiFrameResultResponse(
-                        true,
-                        resultOutputDir, // [重要] 使用 C++ 返回的实际图像目录
-                        resultFiles,
-                        outputData.message != null ? outputData.message : "处理成功",
-                        outputData.fileNum
-                );
-            } else {
-                String errorMsg = "C++ (多帧) 处理失败。状态: " + processStatus + ", 消息: " + outputData.message;
-                logger.error(errorMsg);
-                throw new ProcessException(errorMsg);
-            }
-        } finally {
-            if (outputData != null && outputData.getPointer() != null) {
-                try {
-                    NativeMultiFrameLib.INSTANCE.freeOutputData(outputData);
-                    logger.info("已调用 freeOutputData (多帧) 清理 OutputData。");
-                } catch (Exception e) {
-                    logger.error("调用 freeOutputData (多帧) 时发生错误。", e);
-                }
-            }
-        }
-    }
-
-//                List<String> interestImageNames = new ArrayList<>();
-//                List<String> outputImageNames = new ArrayList<>();
-//
-//                for (String originalRelativePath : originalFileNamesOnly) {
-//                    // 假设C++的输出文件名与输入文件名（除扩展名外）保持一致
-//                    String baseNameWithoutExt;
-//                    int dotIndex = originalRelativePath.lastIndexOf('.');
-//                    if (dotIndex != -1) {
-//                        baseNameWithoutExt = originalRelativePath.substring(0, dotIndex);
-//                    } else {
-//                        baseNameWithoutExt = originalRelativePath;
-//                    }
-//
-//                    // 我们为前端构造预期的、带相对路径的结果文件名
-//                    outputImageNames.add(baseNameWithoutExt + ".png");
-//                    interestImageNames.add("roi_" + baseNameWithoutExt + ".png");
+//            if (processStatus == 0) {
+//                if (outputData.outputPathSet == null) {
+//                    throw new ProcessException("核心算法处理成功 (status=0) 但未返回 outputPathSet。");
 //                }
 //
+//                String resultOutputDir = outputData.outputPathSet.outImgDir;
+//                String featureFilePath = outputData.outputPathSet.feature_path;
+//
+//                if (resultOutputDir == null || resultOutputDir.trim().isEmpty() ||
+//                        featureFilePath == null || featureFilePath.trim().isEmpty()) {
+//                    throw new ProcessException("核心算法返回的路径无效。");
+//                }
+//                logger.info("C++ (多帧) 处理成功。消息: '{}', 图像输出目录: '{}', 特征文件: '{}'", outputData.message, resultOutputDir, featureFilePath);
+//
+//                // C++成功执行后，直接从结果目录读取并排序文件名
+//                List<String> generatedPngFiles;
+//                try (Stream<Path> paths = Files.list(Paths.get(resultOutputDir))) {
+//                    generatedPngFiles = paths
+//                            .map(Path::getFileName)
+//                            .map(Path::toString)
+//                            .filter(name -> name.toLowerCase().endsWith(".png"))
+//                            .collect(Collectors.toList());
+//                }
+//                // 使用自然排序对文件名进行排序
+//                generatedPngFiles.sort(new NaturalOrderComparator());
+//                logger.info("从结果目录 '{}' 读取并排序了 {} 个.png文件。", resultOutputDir, generatedPngFiles.size());
+//
+//                List<String> interestImageNames = new ArrayList<>();
+//                // 假设 "roi_" 图像与结果图像一一对应
+//                for (String pngFile : generatedPngFiles) {
+//                    if (pngFile.toLowerCase().startsWith("roi_")) {
+//                        // 如果已经是roi文件，则跳过，因为我们只关心主输出文件
+//                        continue;
+//                    }
+//                    // 检查是否存在对应的 roi 文件
+//                    Path roiPath = Paths.get(resultOutputDir, "roi_" + pngFile);
+//                    if (Files.exists(roiPath)) {
+//                        interestImageNames.add("roi_" + pngFile);
+//                    }
+//                }
+//                // 过滤掉 roi_ 开头的文件，只保留主结果文件
+//                List<String> outputImageNames = generatedPngFiles.stream()
+//                        .filter(name -> !name.toLowerCase().startsWith("roi_"))
+//                        .collect(Collectors.toList());
+//
+//                // 为每个结果帧找到它对应的原始 .dat 文件名
+//                List<String> expandedOriginalNames = new ArrayList<>();
+//                for (String pngName : outputImageNames) {
+//                    // 移除帧号和扩展名来匹配原始文件名
+//                    String pngBaseName = pngName.substring(0, pngName.lastIndexOf('_'));
+//                    String originalFound = originalFileNamesOnly.stream()
+//                            .map(ofn -> ofn.substring(0, ofn.lastIndexOf('.'))) // 获取原始文件的基础名
+//                            .filter(ofnBase -> ofnBase.equals(pngBaseName))
+//                            .findFirst()
+//                            .orElse(originalFileNamesOnly.get(0)); // 如果找不到，默认用第一个
+//                    expandedOriginalNames.add(originalFound + ".dat"); // 假设原始文件总是 .dat
+//                }
+//
+//
 //                MultiFrameResultResponse.ResultFiles resultFiles =
-//                        new MultiFrameResultResponse.ResultFiles(originalFileNamesOnly, interestImageNames, outputImageNames);
-//                // ========================================================
+//                        new MultiFrameResultResponse.ResultFiles(expandedOriginalNames, interestImageNames, outputImageNames);
 //
 //                return new MultiFrameResultResponse(
-//                        true, resultOutputDir, resultFiles,
+//                        true,
+//                        resultOutputDir, // [重要] 使用 C++ 返回的实际图像目录
+//                        resultFiles,
 //                        outputData.message != null ? outputData.message : "处理成功",
 //                        outputData.fileNum
 //                );
-//            } else {
-//                String errorMsg = "C++ (多帧) 处理失败。状态: " + processStatus + ", 消息: " + outputData.message;
-//                logger.error(errorMsg);
-//                throw new ProcessException(errorMsg);
-//            }
+            } else {
+                // [!! 修改 !!] 释放内存并抛出异常
+                String errorMsg = "C++ (多帧) 处理失败。状态: " + processStatus + ", 消息: " + outputData.message;
+                logger.error(errorMsg);
+                if (outputData != null && outputData.getPointer() != null) {
+                    NativeMultiFrameLib.INSTANCE.freeOutputData(outputData);
+                }
+                throw new ProcessException(errorMsg);
+            }
 //        } finally {
 //            if (outputData != null && outputData.getPointer() != null) {
 //                try {
@@ -627,152 +738,56 @@ public class MultiFrameProcessorCpp {
 //                }
 //            }
 //        }
-//    }
+    }
 
-//    /**
-//     * 处理指定目录中的所有文件，执行多帧图像识别。
-//     * @param inputDirPath 包含图像文件的输入目录的绝对路径。
-//     * @param algorithmName 要使用的算法名称。
-//     * @return 返回一个 {@link MultiFrameResultResponse} 对象，其中包含处理结果的详细信息。
-//     * @throws IOException 如果读取目录或文件时发生 I/O 错误。
-//     * @throws ProcessException 如果处理过程中发生逻辑错误（如目录为空）或 C++ 库返回错误。
-//     */
-//    public MultiFrameResultResponse processDirectory(String inputDirPath, String algorithmName) throws IOException {
-//        logger.info("开始处理多帧图像: 目录 '{}', 算法: {}", inputDirPath, algorithmName);
-//
-//        // --- 1. 扫描并收集目录下的所有文件路径 ---
-//        List<String> filePathsList;
-//        try (Stream<Path> paths = Files.list(Paths.get(inputDirPath))) {
-//            filePathsList = paths
-//                    .filter(Files::isRegularFile) // 只保留文件，忽略子目录
-//                    .map(Path::toAbsolutePath)    // 转换为绝对路径
-//                    .map(Path::toString)          // 转换为字符串
-//                    .collect(Collectors.toList());
-//        } catch (IOException e) {
-//            logger.error("无法读取输入目录中的文件列表: {}", inputDirPath, e);
-//            throw new ProcessException("无法读取输入目录 '" + inputDirPath + "': " + e.getMessage(), e);
-//        }
-//
-//        if (filePathsList.isEmpty()) {
-//            logger.warn("输入目录 {} 为空或不包含文件。", inputDirPath);
-//            throw new ProcessException("指定的输入目录不包含任何文件。");
-//        }
-//
-//        // --- 2. 准备传递给 C++ 的数据 ---
-//        // 将文件路径列表合并成一个由逗号分隔的字符串
-//        String commaSeparatedFilePaths = String.join(",", filePathsList);
-//        int numFiles = filePathsList.size();
-//        logger.info("共有 {} 个图像文件。准备调用C++处理。", numFiles);
-//        // 打印部分路径用于调试，避免日志过长
-//        logger.debug("文件列表 (部分): {}", commaSeparatedFilePaths.substring(0, Math.min(200, commaSeparatedFilePaths.length())));
-//
-//        // 从 ConfigService 加载裁剪框配置
-//        logger.info("正在从 ConfigService 加载配置...");
-//        ConfigDto config = configService.getConfig();
-//        ConfigDto.Region region = config.getRegion();
-//        CropBox.ByValue cropBoxConfig = new CropBox.ByValue(
-//                region.getX(), region.getY(), region.getWidth(), region.getHeight()
-//        );
-//        logger.info("从 ConfigService 成功加载裁剪框: x={}, y={}, width={}, height={}",
-//                region.getX(), region.getY(), region.getWidth(), region.getHeight());
-//
-//        // --- 2.5 计算并准备输出路径 ---
-//        Path projectRoot = getProjectRootPath();
-//        Path resultPath = projectRoot.resolve("result");
-//        // 确保目录存在 (C++层不做目录创建，由Java负责更安全)
-//        if (!Files.exists(resultPath)) {
-//            try {
-//                Files.createDirectories(resultPath);
-//                logger.info("结果目录不存在，已自动创建: {}", resultPath);
-//            } catch (IOException e) {
-//                throw new ProcessException("无法创建结果输出目录: " + resultPath, e);
-//            }
-//        }
-//        String resultPathString = resultPath.toAbsolutePath().toString();
-//        logger.info("将传递给C++的绝对输出路径: {}", resultPathString);
-//
-//        // --- 3. 调用 C++ 库 ---
-//        InputData.ByReference inputData = new InputData.ByReference();
-//        OutputData.ByReference outputData = new OutputData.ByReference();
-//        int processStatus = -1;
-//
-//        try {
-//            // 填充输入结构体
-//            inputData.mode = 1; // 1 代表多帧模式
-//            inputData.algorithmName = algorithmName;
-//            inputData.originalBase64 = commaSeparatedFilePaths;
-//            inputData.croppedBase64 = commaSeparatedFilePaths;
-//            inputData.fileNum = numFiles;
-//            inputData.id = 0; // 未使用
-//            inputData.imgType = 1;
-//            inputData.crop = cropBoxConfig;
-//
-//            inputData.resultDir = resultPathString;
-//
-//            logger.info("调用C++ processImageWrapper (多帧模式)...");
-//            processStatus = NativeMultiFrameLib.INSTANCE.processImageWrapper(inputData, outputData);
-//            logger.info("C++ processImageWrapper (多帧模式) 返回状态: {}", processStatus);
-//
-//            // --- 4. 处理 C++ 返回结果 ---
-//            if (processStatus == 0) { // 成功
-//                String resultOutputDir = outputData.outputDir;
-//                if (resultOutputDir == null || resultOutputDir.trim().isEmpty()) {
-//                    logger.error("C++ (多帧) 处理成功但未返回有效的输出目录路径。");
-//                    throw new ProcessException("核心算法处理成功但未指定输出目录。");
-//                }
-//                logger.info("C++ (多帧) 处理成功。消息: '{}', 输出目录: '{}'", outputData.message, resultOutputDir);
-//
-//                // 根据原始文件名，推断出结果图像和ROI图像的文件名
-//                List<String> originalFileNamesOnly = filePathsList.stream()
-//                        .map(fullPath -> new File(fullPath).getName())
-//                        .collect(Collectors.toList());
-//                List<String> interestImageNames = new ArrayList<>();
-//                List<String> outputImageNames = new ArrayList<>();
-//
-//                for (String originalNameWithExt : originalFileNamesOnly) {
-//                    // 假设结果文件名与原始文件名（除扩展名外）有固定关系
-//                    String baseName = originalNameWithExt.substring(0, originalNameWithExt.lastIndexOf('.'));
-//                    interestImageNames.add("roi_" + baseName + ".png");
-//                    outputImageNames.add(baseName + ".png");
-//                }
-//
-//                MultiFrameResultResponse.ResultFiles resultFiles =
-//                        new MultiFrameResultResponse.ResultFiles(originalFileNamesOnly, interestImageNames, outputImageNames);
-//
-//                // 构建并返回给 Controller 的最终响应对象
-//                return new MultiFrameResultResponse(
-//                        true,
-//                        resultOutputDir,
-//                        resultFiles,
-//                        outputData.message != null ? outputData.message : "处理成功",
-//                        outputData.fileNum // 使用 C++ 返回的实际处理文件数
-//                );
-//
-//            } else { // 失败
-//                String errorMsg = "C++ (多帧) 处理失败。状态: " + processStatus;
-//                if (outputData.message != null && !outputData.message.isEmpty()) {
-//                    errorMsg += ", 消息: " + outputData.message;
-//                }
-//                logger.error(errorMsg);
-//                throw new ProcessException(errorMsg);
-//            }
-//        } catch (UnsatisfiedLinkError ule) {
-//            logger.error("JNA链接错误: {}", ule.getMessage(), ule);
-//            throw new ProcessException("无法链接到多帧核心处理库。确保 XJYTXFXCV_multi 及其依赖项正确。", ule);
-//        }
-//        finally {
-//            // --- 5. 内存管理 ---
-//            // 无论成功或失败，都必须调用 freeOutputData 释放 C++ 分配的内存
-//            if (outputData.getPointer() != null) {
-//                try {
-//                    NativeMultiFrameLib.INSTANCE.freeOutputData(outputData);
-//                    logger.info("已调用 freeOutputData (多帧) 清理 OutputData。");
-//                } catch (Exception e) {
-//                    logger.error("调用 freeOutputData (多帧) 时发生错误。", e);
-//                }
-//            }
-//        }
-//    }
+    // [!! 新增 !!] (从旧的 processFiles 复制过来)
+    // 辅助方法，用于构建返回给前端的 Response
+    private MultiFrameResultResponse buildResponse(String resultOutputDir, String message, int fileNumProcessed, List<String> originalFileNamesOnly) throws IOException {
+        List<String> generatedPngFiles;
+        try (Stream<Path> paths = Files.list(Paths.get(resultOutputDir))) {
+            generatedPngFiles = paths
+                    .map(Path::getFileName)
+                    .map(Path::toString)
+                    .filter(name -> name.toLowerCase().endsWith(".png"))
+                    .collect(Collectors.toList());
+        }
+        generatedPngFiles.sort(new NaturalOrderComparator());
+        logger.info("从结果目录 '{}' 读取并排序了 {} 个.png文件。", resultOutputDir, generatedPngFiles.size());
+
+        List<String> interestImageNames = new ArrayList<>();
+        for (String pngFile : generatedPngFiles) {
+            if (pngFile.toLowerCase().startsWith("roi_")) continue;
+            Path roiPath = Paths.get(resultOutputDir, "roi_" + pngFile);
+            if (Files.exists(roiPath)) {
+                interestImageNames.add("roi_" + pngFile);
+            }
+        }
+        List<String> outputImageNames = generatedPngFiles.stream()
+                .filter(name -> !name.toLowerCase().startsWith("roi_"))
+                .collect(Collectors.toList());
+
+        List<String> expandedOriginalNames = new ArrayList<>();
+        for (String pngName : outputImageNames) {
+            String pngBaseName = pngName.substring(0, pngName.lastIndexOf('_'));
+            String originalFound = originalFileNamesOnly.stream()
+                    .map(ofn -> ofn.substring(0, ofn.lastIndexOf('.')))
+                    .filter(ofnBase -> ofnBase.equals(pngBaseName))
+                    .findFirst()
+                    .orElse(originalFileNamesOnly.get(0));
+            expandedOriginalNames.add(originalFound + ".dat");
+        }
+
+        MultiFrameResultResponse.ResultFiles resultFiles =
+                new MultiFrameResultResponse.ResultFiles(expandedOriginalNames, interestImageNames, outputImageNames);
+
+        return new MultiFrameResultResponse(
+                true,
+                resultOutputDir,
+                resultFiles,
+                message != null ? message : "处理成功",
+                fileNumProcessed
+        );
+    }
 
     /**
      * 获取项目根目录，用于确定统一的输出路径。

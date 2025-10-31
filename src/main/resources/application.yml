@@ -4,22 +4,50 @@ server:
 app:
   features:
     definitions:
-      - { name: "variance", typeChar: "f" }
-      - { name: "mean_region", typeChar: "f" }
-      - { name: "SCR", typeChar: "f" }
-      - { name: "contrast", typeChar: "f" }
-      - { name: "entropy", typeChar: "f" }
-      - { name: "homogeneity", typeChar: "f" }
-      - { name: "smoothness", typeChar: "f" }
-      - { name: "skewness", typeChar: "f" }
-      - { name: "kurtosis", typeChar: "f" }
-      - { name: "xjy_area", typeChar: "i" }
-      - { name: "peak_cell_intensity", typeChar: "f" }
-      - { name: "xjy_background_intensity", typeChar: "f" }
-      - { name: "tl_xs", typeChar: "i" }
-      - { name: "tl_ys", typeChar: "i" }
-      - { name: "widths", typeChar: "i" }
-      - { name: "heights", typeChar: "i" }
+      # C++ 写入顺序:
+      # 1. length (Java 已读)
+      # 2. category_num (Java 将跳过)
+      # 3. category_type (Java 将跳过)
+      # 4. confidences (Java 将跳过)
+      # --- Java 读取列表从这里开始 ---
+      - { name: "variance", typeChar: "f" }                  # 5
+      - { name: "mean_region", typeChar: "f" }               # 6
+      - { name: "SCR", typeChar: "f" }                       # 7
+      - { name: "contrast", typeChar: "f" }                  # 8
+      - { name: "entropy", typeChar: "f" }                   # 9
+      - { name: "homogeneity", typeChar: "f" }               # 10
+      - { name: "smoothness", typeChar: "f" }                # 11
+      - { name: "skewness", typeChar: "f" }                  # 12
+      - { name: "kurtosis", typeChar: "f" }                  # 13
+      - { name: "aspectRatio", typeChar: "f" }               # 14
+      - { name: "longAxis", typeChar: "f" }                  # 15
+      - { name: "shortAxis", typeChar: "f" }                 # 16
+      - { name: "xjy_area", typeChar: "i" }                  # 17 (int32_t)
+      - { name: "peak_cell_intensity", typeChar: "f" }        # 18
+      - { name: "xjy_background_intensity", typeChar: "f" }   # 19
+      - { name: "tl_xs", typeChar: "i" }                     # 20 (int32_t)
+      - { name: "tl_ys", typeChar: "i" }                     # 21 (int32_t)
+      - { name: "widths", typeChar: "i" }                    # 22 (int32_t)
+      - { name: "heights", typeChar: "i" }                   # 23 (int32_t)
+      - { name: "peakPosX", typeChar: "i" }                  # 24 (int32_t)
+      - { name: "peakPosY", typeChar: "i" }                  # 25 (int32_t)
+      - { name: "pixelVelocityX", typeChar: "f" }            # 26
+      - { name: "pixelVelocityY", typeChar: "f" }            # 27
+      - { name: "apMaxRad", typeChar: "f" }                  # 28
+      - { name: "apTotalRad", typeChar: "f" }                # 29
+      - { name: "apAvgRad", typeChar: "f" }                  # 30
+      - { name: "brightnessTemperature", typeChar: "f" }     # 31
+      - { name: "brightnessTemperatureBG", typeChar: "f" }   # 32
+      - { name: "lgt", typeChar: "f" }                       # 33
+      - { name: "lat", typeChar: "f" }                       # 34
+      - { name: "alt", typeChar: "f" }                       # 35
+      - { name: "year", typeChar: "s" }                      # 36 (short)
+      - { name: "month", typeChar: "s" }                     # 37 (short)
+      - { name: "day", typeChar: "s" }                       # 38 (short)
+      - { name: "hour", typeChar: "s" }                      # 39 (short)
+      - { name: "min", typeChar: "s" }                       # 40 (short)
+      - { name: "sec", typeChar: "s" }                       # 41 (short)
+      - { name: "msec", typeChar: "f" }                      # 42
   config:
     ini-path: "lib/data.ini"
 

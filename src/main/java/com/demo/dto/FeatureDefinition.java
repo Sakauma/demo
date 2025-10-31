@@ -21,9 +21,14 @@ public class FeatureDefinition {
      * @throws IllegalArgumentException 如果类型字符不支持，抛出异常。
      */
     public int getTypeSize() {
-        if (typeChar == 'f' || typeChar == 'i') {
-            return 4;
+        switch (typeChar) {
+            case 'f': // float
+            case 'i': // int
+                return 4;
+            case 's': // [!! 新增 short 类型 !!]
+                return 2;
+            default:
+                throw new IllegalArgumentException("不支持的类型字符: " + typeChar);
         }
-        throw new IllegalArgumentException("不支持的类型字符: " + typeChar);
     }
 }
